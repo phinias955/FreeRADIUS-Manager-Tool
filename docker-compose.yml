@@ -1,0 +1,111 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: radius_postgres
+    environment:
+      POSTGRES_DB: ${DB_NAME:-radius}
+      POSTGRES_USER: ${DB_USER:-radius_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-ChangeMe_Secure_Pass123!}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/01-init.sql
+    networks:
+      - radius-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-radius_user} -d ${DB_NAME:-radius}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  freeradius:
+    build: ./freeradius
+    container_name: radius_freeradius
+    ports:
+      - "1812:1812/udp"
+      - "1813:1813/udp"
+      - "18120:18120/udp"
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-radius}
+      DB_USER: ${DB_USER:-radius_user}
+      DB_PASS: ${DB_PASSWORD:-ChangeMe_Secure_Pass123!}
+    volumes:
+      - radius_logs:/var/log/freeradius
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - radius-network
+    restart: unless-stopped
+
+  backend:
+    build: ./backend
+    container_name: radius_backend
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${DB_USER:-radius_user}
+      DB_PASSWORD: ${DB_PASSWORD:-ChangeMe_Secure_Pass123!}
+      DB_NAME: ${DB_NAME:-radius}
+      DB_SSL_MODE: ${DB_SSL_MODE:-disable}
+      JWT_SECRET: ${JWT_SECRET:-change-this-super-secret-jwt-key-in-production}
+      JWT_ACCESS_EXPIRY: ${JWT_ACCESS_EXPIRY:-15m}
+      JWT_REFRESH_EXPIRY: ${JWT_REFRESH_EXPIRY:-168h}
+      RADIUS_HOST: freeradius
+      RADIUS_AUTH_PORT: ${RADIUS_AUTH_PORT:-1812}
+      RADIUS_ACCT_PORT: ${RADIUS_ACCT_PORT:-1813}
+      RADIUS_SECRET: ${RADIUS_SECRET:-testing123-please-change-in-production}
+      RADIUS_TIMEOUT: ${RADIUS_TIMEOUT:-5s}
+      RADIUS_RETRIES: ${RADIUS_RETRIES:-3}
+      WEB_PORT: 8080
+      BCRYPT_COST: ${BCRYPT_COST:-12}
+      RATE_LIMIT: ${RATE_LIMIT:-100}
+      BRUTE_FORCE_ATTEMPTS: ${BRUTE_FORCE_ATTEMPTS:-5}
+      BRUTE_FORCE_LOCKOUT: ${BRUTE_FORCE_LOCKOUT:-15}
+      ADMIN_IP_WHITELIST: ${ADMIN_IP_WHITELIST:-0.0.0.0/0}
+      SESSION_TIMEOUT: ${SESSION_TIMEOUT:-3600}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-noreply@radius-manager.local}
+      BACKUP_SCHEDULE: ${BACKUP_SCHEDULE:-0 2 * * *}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
+      APP_ENV: ${APP_ENV:-production}
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      freeradius:
+        condition: service_started
+    networks:
+      - radius-network
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    container_name: radius_frontend
+    ports:
+      - "8081:80"
+    environment:
+      - VITE_API_URL=${VITE_API_URL:-http://localhost:8080}
+    depends_on:
+      - backend
+    networks:
+      - radius-network
+    restart: unless-stopped
+
+networks:
+  radius-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+  radius_logs:
+    driver: local

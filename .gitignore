@@ -1,0 +1,29 @@
+# Environment
+.env
+*.env.local
+
+# Go
+backend/bin/
+backend/vendor/
+
+# Node
+frontend/node_modules/
+frontend/dist/
+
+# Docker data
+postgres_data/
+radius_logs/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Backups
+*.sql.gz
+backups/
