@@ -77,12 +77,24 @@
             <SignalIcon class="w-5 h-5 flex-shrink-0" />
             Bandwidth Profiles
           </router-link>
+          <router-link to="/ip-pools" class="sidebar-link" active-class="active">
+            <CircleStackIcon class="w-5 h-5 flex-shrink-0" />
+            IP Pools
+          </router-link>
         </template>
 
         <template v-if="authStore.isSuperAdmin">
           <div class="pt-4 pb-2">
-            <p class="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Admin</p>
+            <p class="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">System</p>
           </div>
+          <router-link to="/scheduler" class="sidebar-link" active-class="active">
+            <ClockIcon class="w-5 h-5 flex-shrink-0" />
+            Scheduler
+          </router-link>
+          <router-link to="/api-keys" class="sidebar-link" active-class="active">
+            <KeyIcon class="w-5 h-5 flex-shrink-0" />
+            API Keys
+          </router-link>
           
           <router-link to="/admin-users" class="sidebar-link" active-class="active">
             <ShieldCheckIcon class="w-5 h-5 flex-shrink-0" />
@@ -177,6 +189,9 @@ import {
   CurrencyDollarIcon,
   DocumentTextIcon,
   BellAlertIcon,
+  CircleStackIcon,
+  ClockIcon,
+  KeyIcon,
 } from '@heroicons/vue/24/outline'
 
 const authStore = useAuthStore()

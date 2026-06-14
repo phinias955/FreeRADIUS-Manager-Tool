@@ -108,6 +108,7 @@ func main() {
 	// ── Start Tier 2 background workers ─────────────────────────────────────
 	handlers.StartNASMonitor(db, log)
 	handlers.StartAlertWorker(db, log)
+	handlers.StartScheduler(db, log)
 
 	// API v1 routes
 	v1 := router.Group("/api/v1")
@@ -288,6 +289,39 @@ func main() {
 			alerts.DELETE("/:id", middleware.RequireRole("super_admin"), h.DeleteAlertRule)
 			alerts.POST("/test-email", middleware.RequireRole("super_admin"), h.SendTestEmail)
 		}
+
+		// ── Tier 3 Pro: IP Pools ──────────────────────────────────────────────
+		pools := protected.Group("ip-pools")
+		{
+			pools.GET("", middleware.RequireRole("operator", "admin", "super_admin"), h.ListIPPools)
+			pools.POST("", middleware.RequireRole("admin", "super_admin"), h.CreateIPPool)
+			pools.DELETE("/:id", middleware.RequireRole("admin", "super_admin"), h.DeleteIPPool)
+			pools.GET("/:id/ips", middleware.RequireRole("operator", "admin", "super_admin"), h.ListPoolIPs)
+		}
+		protected.POST("ip-pools/assign", middleware.RequireRole("admin", "super_admin"), h.AssignIP)
+		protected.POST("ip-pools/release", middleware.RequireRole("admin", "super_admin"), h.ReleaseIP)
+
+		// ── Tier 3 Pro: API Keys ──────────────────────────────────────────────
+		apikeys := protected.Group("api-keys")
+		{
+			apikeys.GET("", middleware.RequireRole("super_admin"), h.ListAPIKeys)
+			apikeys.POST("", middleware.RequireRole("super_admin"), h.CreateAPIKey)
+			apikeys.POST("/:id/revoke", middleware.RequireRole("super_admin"), h.RevokeAPIKey)
+			apikeys.DELETE("/:id", middleware.RequireRole("super_admin"), h.DeleteAPIKey)
+			apikeys.GET("/stats", middleware.RequireRole("admin", "super_admin"), h.APIKeyStats)
+		}
+
+		// ── Tier 3 Pro: Scheduler ─────────────────────────────────────────────
+		sched := protected.Group("scheduler")
+		{
+			sched.GET("", middleware.RequireRole("admin", "super_admin"), h.ListScheduledTasks)
+			sched.POST("/:id/toggle", middleware.RequireRole("super_admin"), h.ToggleTask)
+			sched.POST("/:id/run", middleware.RequireRole("super_admin"), h.RunTaskNow)
+			sched.PUT("/:id/schedule", middleware.RequireRole("super_admin"), h.UpdateTaskSchedule)
+		}
+
+		// ── Tier 3 Pro: Bulk Import / Export (replaces existing handlers) ────
+		// NOTE: routes already registered above as radius/users/import & export
 	}
 
 	port := os.Getenv("WEB_PORT")

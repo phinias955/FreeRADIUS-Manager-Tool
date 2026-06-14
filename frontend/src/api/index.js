@@ -231,4 +231,39 @@ export const alertsAPI = {
   testEmail: (data) => api.post('/alerts/test-email', data),
 }
 
+// ── Tier 3 Pro: IP Pools ──────────────────────────────────────────────────
+export const ipPoolsAPI = {
+  list: () => api.get('/ip-pools'),
+  create: (data) => api.post('/ip-pools', data),
+  delete: (id) => api.delete(`/ip-pools/${id}`),
+  listIPs: (poolId) => api.get(`/ip-pools/${poolId}/ips`),
+  assign: (data) => api.post('/ip-pools/assign', data),
+  release: (data) => api.post('/ip-pools/release', data),
+}
+
+// ── Tier 3 Pro: API Keys ──────────────────────────────────────────────────
+export const apiKeysAPI = {
+  list: () => api.get('/api-keys'),
+  create: (data) => api.post('/api-keys', data),
+  revoke: (id) => api.post(`/api-keys/${id}/revoke`),
+  delete: (id) => api.delete(`/api-keys/${id}`),
+  stats: () => api.get('/api-keys/stats'),
+}
+
+// ── Tier 3 Pro: Scheduler ─────────────────────────────────────────────────
+export const schedulerAPI = {
+  list: () => api.get('/scheduler'),
+  toggle: (id) => api.post(`/scheduler/${id}/toggle`),
+  runNow: (id) => api.post(`/scheduler/${id}/run`),
+  updateSchedule: (id, schedule) => api.put(`/scheduler/${id}/schedule`, { schedule }),
+}
+
+// ── Tier 3 Pro: Bulk Import / Export ─────────────────────────────────────
+export const importAPI = {
+  importCSV: (formData) => api.post('/radius/users/import', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }),
+  exportCSV: () => api.get('/radius/users/export', { responseType: 'blob' }),
+}
+
 export default api

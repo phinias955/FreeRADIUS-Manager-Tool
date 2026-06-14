@@ -16,6 +16,10 @@
           <ArrowDownTrayIcon class="w-4 h-4" />
           Export
         </button>
+        <button @click="showImport = true" class="btn-secondary">
+          <ArrowUpTrayIcon class="w-4 h-4" />
+          Import CSV
+        </button>
         <button @click="openCreate" class="btn-primary">
           <PlusIcon class="w-4 h-4" />
           Add User
@@ -209,6 +213,72 @@
       @confirm="deleteUser"
       @cancel="showDeleteConfirm = false"
     />
+
+    <!-- Bulk Import CSV Modal -->
+    <div v-if="showImport" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
+        <div class="flex items-center justify-between p-6 border-b">
+          <h3 class="text-lg font-semibold">Bulk Import Users (CSV)</h3>
+          <button @click="closeImport" class="text-gray-400 hover:text-gray-600"><XMarkIcon class="w-5 h-5" /></button>
+        </div>
+        <div v-if="!importResult" class="p-6 space-y-4">
+          <div class="bg-blue-50 border border-blue-200 rounded-xl p-3 text-xs text-blue-800">
+            <p class="font-semibold mb-1">Required CSV columns:</p>
+            <code class="font-mono">username, password</code>
+            <p class="mt-1">Optional: <code class="font-mono">email, plan_name, data_limit_mb, validity_days, description</code></p>
+          </div>
+          <div
+            class="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center cursor-pointer hover:border-blue-400 transition-colors"
+            @click="$refs.csvInput.click()"
+            @dragover.prevent
+            @drop.prevent="onDrop">
+            <ArrowUpTrayIcon class="w-10 h-10 text-gray-300 mx-auto mb-3" />
+            <p class="text-sm text-gray-600">{{ csvFile ? csvFile.name : 'Click to select or drag & drop CSV' }}</p>
+            <p class="text-xs text-gray-400 mt-1">Max recommended: 5000 rows</p>
+            <input ref="csvInput" type="file" accept=".csv,text/csv" class="hidden" @change="onFileSelect" />
+          </div>
+          <div class="flex justify-end gap-3">
+            <button @click="closeImport" class="btn-secondary">Cancel</button>
+            <button @click="doImport" :disabled="!csvFile || importing" class="btn-primary">
+              <span v-if="importing" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full spinner"></span>
+              Import
+            </button>
+          </div>
+        </div>
+        <div v-else class="p-6 space-y-4">
+          <div class="grid grid-cols-3 gap-3 text-center">
+            <div class="bg-green-50 rounded-xl p-3">
+              <p class="text-2xl font-bold text-green-600">{{ importResult.created }}</p>
+              <p class="text-xs text-green-700">Created</p>
+            </div>
+            <div class="bg-yellow-50 rounded-xl p-3">
+              <p class="text-2xl font-bold text-yellow-600">{{ importResult.skipped }}</p>
+              <p class="text-xs text-yellow-700">Skipped</p>
+            </div>
+            <div class="bg-red-50 rounded-xl p-3">
+              <p class="text-2xl font-bold text-red-600">{{ importResult.failed }}</p>
+              <p class="text-xs text-red-700">Failed</p>
+            </div>
+          </div>
+          <div v-if="importResult.results?.length" class="max-h-48 overflow-y-auto">
+            <table class="w-full text-xs">
+              <thead><tr class="text-gray-500"><th class="text-left py-1">Row</th><th class="text-left">Username</th><th class="text-left">Status</th><th class="text-left">Note</th></tr></thead>
+              <tbody>
+                <tr v-for="r in importResult.results.filter(x => x.status !== 'created')" :key="r.row" class="border-t border-gray-100">
+                  <td class="py-1">{{ r.row }}</td>
+                  <td>{{ r.username || '—' }}</td>
+                  <td><span class="badge text-xs" :class="r.status === 'skip' ? 'badge-yellow' : 'badge-red'">{{ r.status }}</span></td>
+                  <td class="text-gray-400">{{ r.message }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="flex justify-end">
+            <button @click="closeImport" class="btn-primary">Done</button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -216,11 +286,11 @@
 import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '@/store/auth'
 import { useToast } from 'vue-toastification'
-import { radiusUsersAPI } from '@/api'
+import { radiusUsersAPI, importAPI } from '@/api'
 import { format, parseISO } from 'date-fns'
 import {
   PlusIcon, PencilIcon, TrashIcon, KeyIcon, PauseIcon, PlayIcon,
-  ArrowUpTrayIcon, ArrowDownTrayIcon, SignalSlashIcon,
+  ArrowUpTrayIcon, ArrowDownTrayIcon, SignalSlashIcon, XMarkIcon,
 } from '@heroicons/vue/24/outline'
 import UserModal from '@/components/users/UserModal.vue'
 import ResetPasswordModal from '@/components/users/ResetPasswordModal.vue'
@@ -387,6 +457,30 @@ function statusBadge(status) {
 function formatDate(dateStr) {
   if (!dateStr) return ''
   try { return format(parseISO(dateStr), 'MMM d, yyyy') } catch { return dateStr }
+}
+
+// ── Bulk Import ──────────────────────────────────────────────────────────────
+const showImport = ref(false)
+const csvFile = ref(null)
+const importing = ref(false)
+const importResult = ref(null)
+
+function onFileSelect(e) { csvFile.value = e.target.files[0] }
+function onDrop(e) { csvFile.value = e.dataTransfer.files[0] }
+function closeImport() { showImport.value = false; csvFile.value = null; importResult.value = null; loadUsers() }
+
+async function doImport() {
+  if (!csvFile.value) return
+  importing.value = true
+  try {
+    const formData = new FormData()
+    formData.append('file', csvFile.value)
+    const { data } = await importAPI.importCSV(formData)
+    importResult.value = data
+    toast.success(data.message)
+  } catch (err) {
+    toast.error(err.response?.data?.error || 'Import failed')
+  } finally { importing.value = false }
 }
 
 onMounted(loadUsers)

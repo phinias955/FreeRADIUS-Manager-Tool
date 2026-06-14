@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/csv"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	strs "strings"
@@ -544,66 +545,144 @@ func (h *Handler) ImportRadiusUsers(c *gin.Context) {
 	}
 	defer file.Close()
 
-	reader := csv.NewReader(file)
-	reader.FieldsPerRecord = -1
-	records, err := reader.ReadAll()
-	if err != nil {
-		respondError(c, http.StatusBadRequest, "invalid CSV file")
-		return
-	}
-
-	if len(records) < 2 {
-		respondError(c, http.StatusBadRequest, "CSV must have header row and at least one data row")
-		return
-	}
-
 	claims, _ := middleware.GetClaims(c)
-	created := 0
-	errors := []string{}
 
-	for i, row := range records[1:] {
-		if len(row) < 3 {
-			errors = append(errors, fmt.Sprintf("row %d: insufficient columns (need username,password,email)", i+2))
+	reader := csv.NewReader(file)
+	reader.TrimLeadingSpace = true
+
+	// Read header
+	header, err := reader.Read()
+	if err != nil {
+		respondError(c, http.StatusBadRequest, "failed to read CSV header")
+		return
+	}
+
+	colIdx := map[string]int{}
+	for i, col := range header {
+		colIdx[strs.ToLower(strs.TrimSpace(col))] = i
+	}
+	if _, ok := colIdx["username"]; !ok {
+		respondError(c, http.StatusBadRequest, "CSV must have a 'username' column")
+		return
+	}
+	if _, ok := colIdx["password"]; !ok {
+		respondError(c, http.StatusBadRequest, "CSV must have a 'password' column")
+		return
+	}
+
+	type RowResult struct {
+		Row      int    `json:"row"`
+		Username string `json:"username"`
+		Status   string `json:"status"`
+		Message  string `json:"message"`
+	}
+
+	results := []RowResult{}
+	created, skipped, failed := 0, 0, 0
+	rowNum := 1
+
+	for {
+		record, err := reader.Read()
+		if err == io.EOF {
+			break
+		}
+		rowNum++
+		if err != nil {
+			results = append(results, RowResult{rowNum, "", "error", "parse error"})
+			failed++
 			continue
 		}
-		username := strs.TrimSpace(row[0])
-		password := strs.TrimSpace(row[1])
-		email := strs.TrimSpace(row[2])
-		fullName := ""
-		if len(row) > 3 {
-			fullName = strs.TrimSpace(row[3])
+
+		get := func(col string) string {
+			idx, ok := colIdx[col]
+			if !ok || idx >= len(record) {
+				return ""
+			}
+			return strs.TrimSpace(record[idx])
 		}
 
+		username := get("username")
+		password := get("password")
+		if username == "" || password == "" {
+			results = append(results, RowResult{rowNum, username, "skip", "empty username or password"})
+			skipped++
+			continue
+		}
 		if len(password) < 6 {
-			errors = append(errors, fmt.Sprintf("row %d (%s): password too short (min 6 chars)", i+2, username))
+			results = append(results, RowResult{rowNum, username, "skip", "password too short (min 6)"})
+			skipped++
 			continue
 		}
 
 		hash, _ := auth.HashPassword(password)
-		_, err := h.db.Exec(`
-			INSERT INTO radius_users (username, password, email, full_name, created_by)
-			VALUES ($1, $2, $3, $4, $5)
-			ON CONFLICT (username) DO NOTHING`,
-			username, hash, email, fullName, claims.UserID,
-		)
-		if err != nil {
-			errors = append(errors, fmt.Sprintf("row %d (%s): database error", i+2, username))
+		email := get("email")
+		description := get("description")
+		validityStr := get("validity_days")
+		dataLimitStr := get("data_limit_mb")
+
+		validityDays := 30
+		if validityStr != "" {
+			fmt.Sscanf(validityStr, "%d", &validityDays)
+		}
+		var dataLimitMB *int64
+		if dataLimitStr != "" {
+			var dm int64
+			fmt.Sscanf(dataLimitStr, "%d", &dm)
+			if dm > 0 {
+				dataLimitMB = &dm
+			}
+		}
+
+		var accountExpiry *string
+		if validityDays > 0 {
+			exp := time.Now().AddDate(0, 0, validityDays).Format("2006-01-02")
+			accountExpiry = &exp
+		}
+
+		var planID *int
+		if planName := get("plan_name"); planName != "" {
+			var pid int
+			if err := h.db.QueryRow(`SELECT id FROM user_plans WHERE LOWER(name)=LOWER($1)`, planName).Scan(&pid); err == nil {
+				planID = &pid
+			}
+		}
+
+		var newID int
+		insertErr := h.db.QueryRow(`
+			INSERT INTO radius_users (username, email, password, description, status, account_expiry, plan_id, created_by)
+			VALUES ($1,$2,$3,$4,'active',$5,$6,$7) RETURNING id`,
+			username, nullableString(email), hash,
+			nullableString(description), accountExpiry, planID, claims.UserID,
+		).Scan(&newID)
+
+		if insertErr != nil {
+			if isUniqueViolation(insertErr) {
+				results = append(results, RowResult{rowNum, username, "skip", "username already exists"})
+				skipped++
+				continue
+			}
+			results = append(results, RowResult{rowNum, username, "error", insertErr.Error()})
+			failed++
 			continue
 		}
 
-		h.db.Exec(`
-			INSERT INTO radcheck (username, attribute, op, value)
-			VALUES ($1, 'Cleartext-Password', ':=', $2)
-			ON CONFLICT (username, attribute) DO UPDATE SET value = $2`,
-			username, password)
+		h.db.Exec(`INSERT INTO radcheck (username,attribute,op,value) VALUES ($1,'Cleartext-Password',':=',$2)
+			ON CONFLICT (username,attribute) DO UPDATE SET value=$2`, username, password)
 
+		if dataLimitMB != nil {
+			h.db.Exec(`INSERT INTO radcheck (username,attribute,op,value) VALUES ($1,'Max-Octets',':=',$2)
+				ON CONFLICT (username,attribute) DO UPDATE SET value=$2`,
+				username, fmt.Sprintf("%d", *dataLimitMB*1024*1024))
+		}
+
+		results = append(results, RowResult{rowNum, username, "created", ""})
 		created++
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"created": created,
-		"errors":  errors,
-		"message": fmt.Sprintf("imported %d users", created),
+		"message": fmt.Sprintf("Import complete: %d created, %d skipped, %d failed", created, skipped, failed),
+		"created": created, "skipped": skipped, "failed": failed,
+		"total": created + skipped + failed, "results": results,
 	})
 }
 

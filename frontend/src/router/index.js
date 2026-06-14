@@ -104,6 +104,24 @@ const routes = [
         meta: { title: 'Alert Rules', roles: ['admin', 'super_admin'] },
       },
       {
+        path: 'ip-pools',
+        name: 'IPPools',
+        component: () => import('@/views/IPPools.vue'),
+        meta: { title: 'IP Pools', roles: ['operator', 'admin', 'super_admin'] },
+      },
+      {
+        path: 'api-keys',
+        name: 'APIKeys',
+        component: () => import('@/views/APIKeys.vue'),
+        meta: { title: 'API Keys', roles: ['super_admin'] },
+      },
+      {
+        path: 'scheduler',
+        name: 'Scheduler',
+        component: () => import('@/views/Scheduler.vue'),
+        meta: { title: 'Scheduler', roles: ['admin', 'super_admin'] },
+      },
+      {
         path: 'admin-users',
         name: 'AdminUsers',
         component: () => import('@/views/AdminUsers.vue'),
