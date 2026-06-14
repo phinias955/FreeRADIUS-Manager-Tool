@@ -29,6 +29,12 @@ const routes = [
     meta: { requiresAuth: false, title: 'Setup Wizard' },
   },
   {
+    path: '/portal',
+    name: 'UserPortal',
+    component: () => import('@/views/UserPortal.vue'),
+    meta: { requiresAuth: false, title: 'My Account' },
+  },
+  {
     path: '/login',
     name: 'Login',
     component: () => import('@/views/Login.vue'),
@@ -66,6 +72,79 @@ const routes = [
         name: 'Monitor',
         component: () => import('@/views/Monitor.vue'),
         meta: { title: 'Monitoring', roles: ['operator', 'admin', 'super_admin'] },
+      },
+      {
+        path: 'vouchers',
+        name: 'Vouchers',
+        component: () => import('@/views/Vouchers.vue'),
+        meta: { title: 'Vouchers', roles: ['operator', 'admin', 'super_admin'] },
+      },
+      {
+        path: 'bandwidth',
+        name: 'Bandwidth',
+        component: () => import('@/views/BandwidthProfiles.vue'),
+        meta: { title: 'Bandwidth Profiles', roles: ['admin', 'super_admin'] },
+      },
+      {
+        path: 'reports',
+        name: 'Reports',
+        component: () => import('@/views/Reports.vue'),
+        meta: { title: 'Reports', roles: ['operator', 'admin', 'super_admin'] },
+      },
+      {
+        path: 'plans',
+        name: 'Plans',
+        component: () => import('@/views/Plans.vue'),
+        meta: { title: 'User Plans', roles: ['operator', 'admin', 'super_admin'] },
+      },
+      {
+        path: 'billing',
+        name: 'Billing',
+        component: () => import('@/views/Billing.vue'),
+        meta: { title: 'Billing', roles: ['operator', 'admin', 'super_admin'] },
+      },
+      {
+        path: 'alerts',
+        name: 'AlertRules',
+        component: () => import('@/views/AlertRules.vue'),
+        meta: { title: 'Alert Rules', roles: ['admin', 'super_admin'] },
+      },
+      {
+        path: 'ip-pools',
+        name: 'IPPools',
+        component: () => import('@/views/IPPools.vue'),
+        meta: { title: 'IP Pools', roles: ['operator', 'admin', 'super_admin'] },
+      },
+      {
+        path: 'api-keys',
+        name: 'APIKeys',
+        component: () => import('@/views/APIKeys.vue'),
+        meta: { title: 'API Keys', roles: ['super_admin'] },
+      },
+      {
+        path: 'scheduler',
+        name: 'Scheduler',
+        component: () => import('@/views/Scheduler.vue'),
+        meta: { title: 'Scheduler', roles: ['admin', 'super_admin'] },
+      },
+      // ── Tier 4 Pro ──────────────────────────────────────────────────────
+      {
+        path: 'zones',
+        name: 'HotspotZones',
+        component: () => import('@/views/HotspotZones.vue'),
+        meta: { title: 'Hotspot Zones', roles: ['operator', 'admin', 'super_admin'] },
+      },
+      {
+        path: 'network-map',
+        name: 'NetworkMap',
+        component: () => import('@/views/NetworkMap.vue'),
+        meta: { title: 'Network Map', roles: ['operator', 'admin', 'super_admin'] },
+      },
+      {
+        path: 'sms',
+        name: 'SMS',
+        component: () => import('@/views/SMS.vue'),
+        meta: { title: 'SMS Notifications', roles: ['admin', 'super_admin'] },
       },
       {
         path: 'admin-users',

@@ -14,8 +14,8 @@
           </svg>
         </div>
         <div>
-          <div class="font-bold text-gray-900 text-sm leading-tight">RADIUS Manager</div>
-          <div class="text-xs text-gray-500">v1.0.0</div>
+          <div class="font-bold text-gray-900 text-sm leading-tight">RADIUS Manager Pro</div>
+          <div class="text-xs text-blue-600 font-medium">v2.0 Pro</div>
         </div>
       </div>
 
@@ -41,10 +41,72 @@
           Monitoring
         </router-link>
 
+        <router-link to="/vouchers" class="sidebar-link" active-class="active">
+          <TicketIcon class="w-5 h-5 flex-shrink-0" />
+          Vouchers
+        </router-link>
+
+        <router-link to="/reports" class="sidebar-link" active-class="active">
+          <DocumentChartBarIcon class="w-5 h-5 flex-shrink-0" />
+          Reports
+        </router-link>
+
+        <template v-if="authStore.isAdmin || authStore.isSuperAdmin">
+          <div class="pt-4 pb-2">
+            <p class="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Business</p>
+          </div>
+          <router-link to="/plans" class="sidebar-link" active-class="active">
+            <CurrencyDollarIcon class="w-5 h-5 flex-shrink-0" />
+            User Plans
+          </router-link>
+          <router-link to="/billing" class="sidebar-link" active-class="active">
+            <DocumentTextIcon class="w-5 h-5 flex-shrink-0" />
+            Billing
+          </router-link>
+          <router-link to="/alerts" class="sidebar-link" active-class="active">
+            <BellAlertIcon class="w-5 h-5 flex-shrink-0" />
+            Alert Rules
+          </router-link>
+        </template>
+
+        <template v-if="authStore.isAdmin || authStore.isSuperAdmin">
+          <div class="pt-4 pb-2">
+            <p class="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Network</p>
+          </div>
+          <router-link to="/bandwidth" class="sidebar-link" active-class="active">
+            <SignalIcon class="w-5 h-5 flex-shrink-0" />
+            Bandwidth Profiles
+          </router-link>
+          <router-link to="/ip-pools" class="sidebar-link" active-class="active">
+            <CircleStackIcon class="w-5 h-5 flex-shrink-0" />
+            IP Pools
+          </router-link>
+          <router-link to="/zones" class="sidebar-link" active-class="active">
+            <MapPinIcon class="w-5 h-5 flex-shrink-0" />
+            Hotspot Zones
+          </router-link>
+          <router-link to="/network-map" class="sidebar-link" active-class="active">
+            <GlobeAltIcon class="w-5 h-5 flex-shrink-0" />
+            Network Map
+          </router-link>
+        </template>
+
         <template v-if="authStore.isSuperAdmin">
           <div class="pt-4 pb-2">
-            <p class="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Admin</p>
+            <p class="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">System</p>
           </div>
+          <router-link to="/scheduler" class="sidebar-link" active-class="active">
+            <ClockIcon class="w-5 h-5 flex-shrink-0" />
+            Scheduler
+          </router-link>
+          <router-link to="/api-keys" class="sidebar-link" active-class="active">
+            <KeyIcon class="w-5 h-5 flex-shrink-0" />
+            API Keys
+          </router-link>
+          <router-link to="/sms" class="sidebar-link" active-class="active">
+            <DevicePhoneMobileIcon class="w-5 h-5 flex-shrink-0" />
+            SMS Alerts
+          </router-link>
           
           <router-link to="/admin-users" class="sidebar-link" active-class="active">
             <ShieldCheckIcon class="w-5 h-5 flex-shrink-0" />
@@ -133,6 +195,18 @@ import {
   ShieldCheckIcon,
   CogIcon,
   ArrowRightOnRectangleIcon,
+  TicketIcon,
+  DocumentChartBarIcon,
+  SignalIcon,
+  CurrencyDollarIcon,
+  DocumentTextIcon,
+  BellAlertIcon,
+  CircleStackIcon,
+  ClockIcon,
+  KeyIcon,
+  MapPinIcon,
+  GlobeAltIcon,
+  DevicePhoneMobileIcon,
 } from '@heroicons/vue/24/outline'
 
 const authStore = useAuthStore()

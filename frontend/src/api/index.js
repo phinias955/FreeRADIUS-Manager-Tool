@@ -170,4 +170,127 @@ export const setupAPI = {
   complete: (data) => api.post('/setup/complete', data),
 }
 
+// ── Tier 1 Pro: Vouchers ──────────────────────────────────────────────────
+export const voucherAPI = {
+  list: (params) => api.get('/vouchers', { params }),
+  generate: (data) => api.post('/vouchers/generate', data),
+  batches: () => api.get('/vouchers/batches'),
+  disable: (id) => api.post(`/vouchers/${id}/disable`),
+  delete: (id) => api.delete(`/vouchers/${id}`),
+  export: (params) => api.get('/vouchers/export', { params, responseType: 'blob' }),
+}
+
+// ── Tier 1 Pro: Bandwidth Profiles ───────────────────────────────────────
+export const bandwidthAPI = {
+  list: () => api.get('/bandwidth-profiles'),
+  create: (data) => api.post('/bandwidth-profiles', data),
+  update: (id, data) => api.put(`/bandwidth-profiles/${id}`, data),
+  delete: (id) => api.delete(`/bandwidth-profiles/${id}`),
+  applyToUser: (userId, profileId) => api.post(`/radius/users/${userId}/bandwidth`, { profile_id: profileId }),
+}
+
+// ── Tier 1 Pro: Reports ───────────────────────────────────────────────────
+export const reportsAPI = {
+  usage: (params) => api.get('/reports/usage', { params }),
+  daily: (params) => api.get('/reports/usage/daily', { params }),
+  auth: (params) => api.get('/reports/auth', { params }),
+  nas: (params) => api.get('/reports/nas', { params }),
+  exportUsage: (params) => api.get('/reports/usage/export', { params, responseType: 'blob' }),
+}
+
+// ── Tier 2 Pro: User Plans ────────────────────────────────────────────────
+export const plansAPI = {
+  list: () => api.get('/plans'),
+  create: (data) => api.post('/plans', data),
+  update: (id, data) => api.put(`/plans/${id}`, data),
+  delete: (id) => api.delete(`/plans/${id}`),
+  assignToUser: (userId, planId) => api.post(`/radius/users/${userId}/plan`, { plan_id: planId }),
+}
+
+// ── Tier 2 Pro: Billing ───────────────────────────────────────────────────
+export const billingAPI = {
+  list: (params) => api.get('/invoices', { params }),
+  create: (data) => api.post('/invoices', data),
+  update: (id, data) => api.put(`/invoices/${id}`, data),
+  delete: (id) => api.delete(`/invoices/${id}`),
+}
+
+// ── Tier 2 Pro: NAS Status ────────────────────────────────────────────────
+// nasAPI extended with status + ping
+export const nasStatusAPI = {
+  status: () => api.get('/nas/status'),
+  pingNow: (id) => api.post(`/nas/${id}/ping`),
+}
+
+// ── Tier 2 Pro: Alert Rules ───────────────────────────────────────────────
+export const alertsAPI = {
+  list: () => api.get('/alerts'),
+  create: (data) => api.post('/alerts', data),
+  update: (id, data) => api.put(`/alerts/${id}`, data),
+  delete: (id) => api.delete(`/alerts/${id}`),
+  testEmail: (data) => api.post('/alerts/test-email', data),
+}
+
+// ── Tier 3 Pro: IP Pools ──────────────────────────────────────────────────
+export const ipPoolsAPI = {
+  list: () => api.get('/ip-pools'),
+  create: (data) => api.post('/ip-pools', data),
+  delete: (id) => api.delete(`/ip-pools/${id}`),
+  listIPs: (poolId) => api.get(`/ip-pools/${poolId}/ips`),
+  assign: (data) => api.post('/ip-pools/assign', data),
+  release: (data) => api.post('/ip-pools/release', data),
+}
+
+// ── Tier 3 Pro: API Keys ──────────────────────────────────────────────────
+export const apiKeysAPI = {
+  list: () => api.get('/api-keys'),
+  create: (data) => api.post('/api-keys', data),
+  revoke: (id) => api.post(`/api-keys/${id}/revoke`),
+  delete: (id) => api.delete(`/api-keys/${id}`),
+  stats: () => api.get('/api-keys/stats'),
+}
+
+// ── Tier 3 Pro: Scheduler ─────────────────────────────────────────────────
+export const schedulerAPI = {
+  list: () => api.get('/scheduler'),
+  toggle: (id) => api.post(`/scheduler/${id}/toggle`),
+  runNow: (id) => api.post(`/scheduler/${id}/run`),
+  updateSchedule: (id, schedule) => api.put(`/scheduler/${id}/schedule`, { schedule }),
+}
+
+// ── Tier 3 Pro: Bulk Import / Export ─────────────────────────────────────
+export const importAPI = {
+  importCSV: (formData) => api.post('/radius/users/import', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }),
+  exportCSV: () => api.get('/radius/users/export', { responseType: 'blob' }),
+}
+
+// ── Tier 4 Pro: Hotspot Zones ─────────────────────────────────────────────
+export const zonesAPI = {
+  list: () => api.get('/zones'),
+  create: (data) => api.post('/zones', data),
+  update: (id, data) => api.put(`/zones/${id}`, data),
+  delete: (id) => api.delete(`/zones/${id}`),
+  stats: (id) => api.get(`/zones/${id}/stats`),
+  assignNAS: (data) => api.post('/zones/assign-nas', data),
+}
+
+// ── Tier 4 Pro: SMS ───────────────────────────────────────────────────────
+export const smsAPI = {
+  send: (data) => api.post('/sms/send', data),
+  logs: (params) => api.get('/sms/logs', { params }),
+  notifyExpiry: (data) => api.post('/sms/notify-expiry', data),
+  config: () => api.get('/sms/config'),
+}
+
+// ── Tier 4 Pro: Live Stats (SSE helper) ───────────────────────────────────
+export const liveStatsAPI = {
+  current: () => api.get('/live/stats/current'),
+  createEventSource: () => {
+    const token = localStorage.getItem('access_token') || ''
+    return new EventSource(`/api/v1/live/stats?token=${encodeURIComponent(token)}`)
+  },
+}
+
 export default api

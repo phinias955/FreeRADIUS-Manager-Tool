@@ -105,6 +105,11 @@ func main() {
 	// Initialize handlers
 	h := handlers.New(db, log)
 
+	// ── Start Tier 2 background workers ─────────────────────────────────────
+	handlers.StartNASMonitor(db, log)
+	handlers.StartAlertWorker(db, log)
+	handlers.StartScheduler(db, log)
+
 	// API v1 routes
 	v1 := router.Group("/api/v1")
 	{
@@ -149,6 +154,14 @@ func main() {
 			auth.POST("/change-password", middleware.RequireAuth(), h.ChangePassword)
 			auth.POST("/mfa/setup", middleware.RequireAuth(), h.MFASetup)
 			auth.POST("/mfa/verify", middleware.RequireAuth(), h.MFAVerify)
+		}
+
+		// ── Tier 4 Pro: User Self-Service Portal (public, no JWT) ────────────
+		portal := v1.Group("/portal")
+		{
+			portal.POST("/login", h.PortalLogin)
+			portal.POST("/logout", h.PortalLogout)
+			portal.GET("/dashboard", h.PortalAuthMiddleware(), h.PortalDashboard)
 		}
 
 		// Protected routes
@@ -218,6 +231,129 @@ func main() {
 		protected.POST("backup", middleware.RequireRole("super_admin"), h.CreateBackup)
 		protected.POST("restore", middleware.RequireRole("super_admin"), h.RestoreBackup)
 		protected.GET("backups", middleware.RequireRole("super_admin"), h.ListBackups)
+
+		// ── Tier 1 Pro: Vouchers ─────────────────────────────────────────────
+		vouchers := protected.Group("vouchers")
+		{
+			vouchers.GET("", middleware.RequireRole("operator", "admin", "super_admin"), h.ListVouchers)
+			vouchers.POST("/generate", middleware.RequireRole("admin", "super_admin"), h.GenerateVouchers)
+			vouchers.GET("/batches", middleware.RequireRole("operator", "admin", "super_admin"), h.GetVoucherBatches)
+			vouchers.POST("/:id/disable", middleware.RequireRole("admin", "super_admin"), h.DisableVoucher)
+			vouchers.DELETE("/:id", middleware.RequireRole("admin", "super_admin"), h.DeleteVoucher)
+			vouchers.GET("/export", middleware.RequireRole("admin", "super_admin"), h.ExportVouchers)
+		}
+
+		// ── Tier 1 Pro: Bandwidth Profiles ───────────────────────────────────
+		bw := protected.Group("bandwidth-profiles")
+		{
+			bw.GET("", middleware.RequireRole("operator", "admin", "super_admin"), h.ListBandwidthProfiles)
+			bw.POST("", middleware.RequireRole("admin", "super_admin"), h.CreateBandwidthProfile)
+			bw.PUT("/:id", middleware.RequireRole("admin", "super_admin"), h.UpdateBandwidthProfile)
+			bw.DELETE("/:id", middleware.RequireRole("admin", "super_admin"), h.DeleteBandwidthProfile)
+		}
+		// Apply bandwidth profile to a RADIUS user
+		protected.POST("radius/users/:id/bandwidth", middleware.RequireRole("admin", "super_admin"), h.ApplyBandwidthProfile)
+
+		// ── Tier 1 Pro: Reports ───────────────────────────────────────────────
+		reports := protected.Group("reports")
+		reports.Use(middleware.RequireRole("operator", "admin", "super_admin"))
+		{
+			reports.GET("/usage", h.UsageReport)
+			reports.GET("/usage/daily", h.DailyUsageReport)
+			reports.GET("/auth", h.AuthSuccessReport)
+			reports.GET("/nas", h.NASUsageReport)
+			reports.GET("/usage/export", h.ExportUsageReport)
+		}
+
+		// ── Tier 2 Pro: User Plans ────────────────────────────────────────────
+		plans := protected.Group("plans")
+		{
+			plans.GET("", middleware.RequireRole("operator", "admin", "super_admin"), h.ListPlans)
+			plans.POST("", middleware.RequireRole("admin", "super_admin"), h.CreatePlan)
+			plans.PUT("/:id", middleware.RequireRole("admin", "super_admin"), h.UpdatePlan)
+			plans.DELETE("/:id", middleware.RequireRole("admin", "super_admin"), h.DeletePlan)
+		}
+		protected.POST("radius/users/:id/plan", middleware.RequireRole("admin", "super_admin"), h.AssignPlan)
+
+		// ── Tier 2 Pro: Billing / Invoices ────────────────────────────────────
+		billing := protected.Group("invoices")
+		{
+			billing.GET("", middleware.RequireRole("operator", "admin", "super_admin"), h.ListInvoices)
+			billing.POST("", middleware.RequireRole("admin", "super_admin"), h.CreateInvoice)
+			billing.PUT("/:id", middleware.RequireRole("admin", "super_admin"), h.UpdateInvoice)
+			billing.DELETE("/:id", middleware.RequireRole("admin", "super_admin"), h.DeleteInvoice)
+		}
+
+		// ── Tier 2 Pro: NAS Monitor ───────────────────────────────────────────
+		protected.GET("nas/status", middleware.RequireRole("operator", "admin", "super_admin"), h.GetNASStatus)
+		protected.POST("nas/:id/ping", middleware.RequireRole("admin", "super_admin"), h.PingNASNow)
+
+		// ── Tier 2 Pro: Alert Rules ───────────────────────────────────────────
+		alerts := protected.Group("alerts")
+		{
+			alerts.GET("", middleware.RequireRole("admin", "super_admin"), h.ListAlertRules)
+			alerts.POST("", middleware.RequireRole("super_admin"), h.CreateAlertRule)
+			alerts.PUT("/:id", middleware.RequireRole("super_admin"), h.UpdateAlertRule)
+			alerts.DELETE("/:id", middleware.RequireRole("super_admin"), h.DeleteAlertRule)
+			alerts.POST("/test-email", middleware.RequireRole("super_admin"), h.SendTestEmail)
+		}
+
+		// ── Tier 3 Pro: IP Pools ──────────────────────────────────────────────
+		pools := protected.Group("ip-pools")
+		{
+			pools.GET("", middleware.RequireRole("operator", "admin", "super_admin"), h.ListIPPools)
+			pools.POST("", middleware.RequireRole("admin", "super_admin"), h.CreateIPPool)
+			pools.DELETE("/:id", middleware.RequireRole("admin", "super_admin"), h.DeleteIPPool)
+			pools.GET("/:id/ips", middleware.RequireRole("operator", "admin", "super_admin"), h.ListPoolIPs)
+		}
+		protected.POST("ip-pools/assign", middleware.RequireRole("admin", "super_admin"), h.AssignIP)
+		protected.POST("ip-pools/release", middleware.RequireRole("admin", "super_admin"), h.ReleaseIP)
+
+		// ── Tier 3 Pro: API Keys ──────────────────────────────────────────────
+		apikeys := protected.Group("api-keys")
+		{
+			apikeys.GET("", middleware.RequireRole("super_admin"), h.ListAPIKeys)
+			apikeys.POST("", middleware.RequireRole("super_admin"), h.CreateAPIKey)
+			apikeys.POST("/:id/revoke", middleware.RequireRole("super_admin"), h.RevokeAPIKey)
+			apikeys.DELETE("/:id", middleware.RequireRole("super_admin"), h.DeleteAPIKey)
+			apikeys.GET("/stats", middleware.RequireRole("admin", "super_admin"), h.APIKeyStats)
+		}
+
+		// ── Tier 3 Pro: Scheduler ─────────────────────────────────────────────
+		sched := protected.Group("scheduler")
+		{
+			sched.GET("", middleware.RequireRole("admin", "super_admin"), h.ListScheduledTasks)
+			sched.POST("/:id/toggle", middleware.RequireRole("super_admin"), h.ToggleTask)
+			sched.POST("/:id/run", middleware.RequireRole("super_admin"), h.RunTaskNow)
+			sched.PUT("/:id/schedule", middleware.RequireRole("super_admin"), h.UpdateTaskSchedule)
+		}
+
+		// ── Tier 3 Pro: Bulk Import / Export (replaces existing handlers) ────
+		// NOTE: routes already registered above as radius/users/import & export
+
+		// ── Tier 4 Pro: Hotspot Zones ─────────────────────────────────────────
+		zones := protected.Group("zones")
+		{
+			zones.GET("", middleware.RequireRole("operator", "admin", "super_admin"), h.ListZones)
+			zones.POST("", middleware.RequireRole("admin", "super_admin"), h.CreateZone)
+			zones.PUT("/:id", middleware.RequireRole("admin", "super_admin"), h.UpdateZone)
+			zones.DELETE("/:id", middleware.RequireRole("admin", "super_admin"), h.DeleteZone)
+			zones.GET("/:id/stats", middleware.RequireRole("operator", "admin", "super_admin"), h.ZoneStats)
+		}
+		protected.POST("zones/assign-nas", middleware.RequireRole("admin", "super_admin"), h.AssignNASToZone)
+
+		// ── Tier 4 Pro: Live Stats SSE ────────────────────────────────────────
+		protected.GET("live/stats", middleware.RequireRole("operator", "admin", "super_admin"), h.LiveStats)
+		protected.GET("live/stats/current", middleware.RequireRole("operator", "admin", "super_admin"), h.GetCurrentStats)
+
+		// ── Tier 4 Pro: SMS ───────────────────────────────────────────────────
+		smsGroup := protected.Group("sms")
+		{
+			smsGroup.POST("/send", middleware.RequireRole("admin", "super_admin"), h.SendSMS)
+			smsGroup.GET("/logs", middleware.RequireRole("admin", "super_admin"), h.ListSMSLogs)
+			smsGroup.POST("/notify-expiry", middleware.RequireRole("admin", "super_admin"), h.NotifyUserExpiry)
+			smsGroup.GET("/config", middleware.RequireRole("super_admin"), h.SMSConfig)
+		}
 	}
 
 	port := os.Getenv("WEB_PORT")
@@ -240,7 +376,7 @@ func main() {
 		}
 	}()
 
-	// Graceful shutdown
+	// Graceful shutdown 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
