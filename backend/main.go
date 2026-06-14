@@ -407,6 +407,45 @@ func main() {
 			hooks.POST("/:id/test", middleware.RequireRole("super_admin"), h.TestWebhook)
 			hooks.GET("/:id/logs", middleware.RequireRole("admin", "super_admin"), h.ListWebhookLogs)
 		}
+
+		// ── Tier 6 Pro: Payments ─────────────────────────────────────────────
+		payments := protected.Group("payments")
+		{
+			payments.GET("", middleware.RequireRole("operator", "admin", "super_admin"), h.ListPayments)
+			payments.POST("", middleware.RequireRole("admin", "super_admin"), h.CreatePayment)
+			payments.DELETE("/:id", middleware.RequireRole("super_admin"), h.DeletePayment)
+			payments.GET("/:id/receipt", middleware.RequireRole("operator", "admin", "super_admin"), h.GetPaymentReceipt)
+			payments.GET("/summary", middleware.RequireRole("admin", "super_admin"), h.PaymentSummary)
+		}
+
+		// ── Tier 6 Pro: RADIUS Attribute Templates ────────────────────────────
+		tmpl := protected.Group("templates")
+		{
+			tmpl.GET("", middleware.RequireRole("operator", "admin", "super_admin"), h.ListTemplates)
+			tmpl.POST("", middleware.RequireRole("admin", "super_admin"), h.CreateTemplate)
+			tmpl.PUT("/:id", middleware.RequireRole("admin", "super_admin"), h.UpdateTemplate)
+			tmpl.DELETE("/:id", middleware.RequireRole("admin", "super_admin"), h.DeleteTemplate)
+			tmpl.POST("/:id/apply", middleware.RequireRole("admin", "super_admin"), h.ApplyTemplate)
+			tmpl.POST("/:id/clone", middleware.RequireRole("admin", "super_admin"), h.CloneTemplate)
+		}
+
+		// ── Tier 6 Pro: Promotions ────────────────────────────────────────────
+		promos := protected.Group("promotions")
+		{
+			promos.GET("", middleware.RequireRole("operator", "admin", "super_admin"), h.ListPromotions)
+			promos.POST("", middleware.RequireRole("admin", "super_admin"), h.CreatePromotion)
+			promos.PUT("/:id", middleware.RequireRole("admin", "super_admin"), h.UpdatePromotion)
+			promos.DELETE("/:id", middleware.RequireRole("admin", "super_admin"), h.DeletePromotion)
+			promos.POST("/validate", middleware.RequireRole("operator", "admin", "super_admin"), h.ValidatePromoCode)
+			promos.POST("/apply", middleware.RequireRole("operator", "admin", "super_admin"), h.ApplyPromoCode)
+		}
+
+		// ── Tier 6 Pro: Bulk Operations ───────────────────────────────────────
+		bulk := protected.Group("bulk")
+		{
+			bulk.POST("", middleware.RequireRole("admin", "super_admin"), h.BulkOperation)
+			bulk.GET("/history", middleware.RequireRole("admin", "super_admin"), h.ListBulkOpHistory)
+		}
 	}
 
 	port := os.Getenv("WEB_PORT")

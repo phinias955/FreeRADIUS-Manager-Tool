@@ -67,6 +67,14 @@
             <BellAlertIcon class="w-5 h-5 flex-shrink-0" />
             Alert Rules
           </router-link>
+          <router-link to="/payments" class="sidebar-link" active-class="active">
+            <BanknotesIcon class="w-5 h-5 flex-shrink-0" />
+            Payments
+          </router-link>
+          <router-link to="/promotions" class="sidebar-link" active-class="active">
+            <TagIcon class="w-5 h-5 flex-shrink-0" />
+            Promotions
+          </router-link>
         </template>
 
         <template v-if="authStore.isAdmin || authStore.isSuperAdmin">
@@ -133,6 +141,14 @@
           <router-link to="/webhooks" class="sidebar-link" active-class="active">
             <LinkIcon class="w-5 h-5 flex-shrink-0" />
             Webhooks
+          </router-link>
+          <router-link to="/templates" class="sidebar-link" active-class="active">
+            <CodeBracketSquareIcon class="w-5 h-5 flex-shrink-0" />
+            RADIUS Templates
+          </router-link>
+          <router-link to="/bulk" class="sidebar-link" active-class="active">
+            <BoltIcon class="w-5 h-5 flex-shrink-0" />
+            Bulk Operations
           </router-link>
           
           <router-link to="/admin-users" class="sidebar-link" active-class="active">
@@ -239,6 +255,10 @@ import {
   WifiIcon,
   LinkIcon,
   TicketIcon as TicketIconOutline,
+  BanknotesIcon,
+  TagIcon,
+  CodeBracketSquareIcon,
+  BoltIcon,
 } from '@heroicons/vue/24/outline'
 
 const authStore = useAuthStore()

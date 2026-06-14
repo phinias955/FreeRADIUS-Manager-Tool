@@ -177,6 +177,31 @@ const routes = [
         component: () => import('@/views/Webhooks.vue'),
         meta: { title: 'Webhooks', roles: ['admin', 'super_admin'] },
       },
+      // ── Tier 6 Pro ──────────────────────────────────────────────────────
+      {
+        path: 'payments',
+        name: 'Payments',
+        component: () => import('@/views/Payments.vue'),
+        meta: { title: 'Payments', roles: ['operator', 'admin', 'super_admin'] },
+      },
+      {
+        path: 'templates',
+        name: 'RadiusTemplates',
+        component: () => import('@/views/RadiusTemplates.vue'),
+        meta: { title: 'RADIUS Templates', roles: ['admin', 'super_admin'] },
+      },
+      {
+        path: 'promotions',
+        name: 'Promotions',
+        component: () => import('@/views/Promotions.vue'),
+        meta: { title: 'Promotions', roles: ['admin', 'super_admin'] },
+      },
+      {
+        path: 'bulk',
+        name: 'BulkOps',
+        component: () => import('@/views/BulkOps.vue'),
+        meta: { title: 'Bulk Operations', roles: ['admin', 'super_admin'] },
+      },
       {
         path: 'admin-users',
         name: 'AdminUsers',

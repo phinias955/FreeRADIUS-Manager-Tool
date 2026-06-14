@@ -338,4 +338,38 @@ export const webhooksAPI = {
   logs: (id) => api.get(`/webhooks/${id}/logs`),
 }
 
+// ── Tier 6 Pro: Payments ──────────────────────────────────────────────────
+export const paymentsAPI = {
+  list: (params) => api.get('/payments', { params }),
+  create: (data) => api.post('/payments', data),
+  delete: (id) => api.delete(`/payments/${id}`),
+  summary: () => api.get('/payments/summary'),
+}
+
+// ── Tier 6 Pro: RADIUS Attribute Templates ────────────────────────────────
+export const templatesAPI = {
+  list: () => api.get('/templates'),
+  create: (data) => api.post('/templates', data),
+  update: (id, data) => api.put(`/templates/${id}`, data),
+  delete: (id) => api.delete(`/templates/${id}`),
+  apply: (id, data) => api.post(`/templates/${id}/apply`, data),
+  clone: (id, data) => api.post(`/templates/${id}/clone`, data),
+}
+
+// ── Tier 6 Pro: Promotions ────────────────────────────────────────────────
+export const promotionsAPI = {
+  list: () => api.get('/promotions'),
+  create: (data) => api.post('/promotions', data),
+  update: (id, data) => api.put(`/promotions/${id}`, data),
+  delete: (id) => api.delete(`/promotions/${id}`),
+  validate: (data) => api.post('/promotions/validate', data),
+  apply: (data) => api.post('/promotions/apply', data),
+}
+
+// ── Tier 6 Pro: Bulk Operations ───────────────────────────────────────────
+export const bulkAPI = {
+  execute: (data) => api.post('/bulk', data),
+  history: () => api.get('/bulk/history'),
+}
+
 export default api
