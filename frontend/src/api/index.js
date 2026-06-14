@@ -372,4 +372,25 @@ export const bulkAPI = {
   history: () => api.get('/bulk/history'),
 }
 
+// ── Tier 7: Security Suite ────────────────────────────────────────────────
+export const securityAPI = {
+  getSummary: () => api.get('/security/summary'),
+  listAlerts: (params) => api.get('/security/alerts', { params }),
+  ackAlert: (id) => api.put(`/security/alerts/${id}/ack`),
+  ackAllAlerts: () => api.put('/security/alerts/ack-all'),
+  deleteAlert: (id) => api.delete(`/security/alerts/${id}`),
+  getBlockedIPs: () => api.get('/security/blocked-ips'),
+  blockIP: (data) => api.post('/security/blocked-ips', data),
+  unblockIP: (id) => api.delete(`/security/blocked-ips/${id}`),
+  geoipLookup: (ip) => api.get('/security/geoip/lookup', { params: { ip } }),
+  listGeoIPRules: () => api.get('/security/geoip/rules'),
+  createGeoIPRule: (data) => api.post('/security/geoip/rules', data),
+  deleteGeoIPRule: (id) => api.delete(`/security/geoip/rules/${id}`),
+  honeypotStatus: () => api.get('/security/honeypot/status'),
+  listHoneypotLogs: (params) => api.get('/security/honeypot/logs', { params }),
+  clearHoneypotLogs: (data) => api.delete('/security/honeypot/logs', { data }),
+  simulateAuth: (data) => api.post('/radius/simulate', data),
+  simulateBatch: (data) => api.post('/radius/simulate/batch', data),
+}
+
 export default api
