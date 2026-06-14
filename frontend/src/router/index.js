@@ -86,6 +86,24 @@ const routes = [
         meta: { title: 'Reports', roles: ['operator', 'admin', 'super_admin'] },
       },
       {
+        path: 'plans',
+        name: 'Plans',
+        component: () => import('@/views/Plans.vue'),
+        meta: { title: 'User Plans', roles: ['operator', 'admin', 'super_admin'] },
+      },
+      {
+        path: 'billing',
+        name: 'Billing',
+        component: () => import('@/views/Billing.vue'),
+        meta: { title: 'Billing', roles: ['operator', 'admin', 'super_admin'] },
+      },
+      {
+        path: 'alerts',
+        name: 'AlertRules',
+        component: () => import('@/views/AlertRules.vue'),
+        meta: { title: 'Alert Rules', roles: ['admin', 'super_admin'] },
+      },
+      {
         path: 'admin-users',
         name: 'AdminUsers',
         component: () => import('@/views/AdminUsers.vue'),

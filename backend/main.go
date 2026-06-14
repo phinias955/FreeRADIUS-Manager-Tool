@@ -105,6 +105,10 @@ func main() {
 	// Initialize handlers
 	h := handlers.New(db, log)
 
+	// ── Start Tier 2 background workers ─────────────────────────────────────
+	handlers.StartNASMonitor(db, log)
+	handlers.StartAlertWorker(db, log)
+
 	// API v1 routes
 	v1 := router.Group("/api/v1")
 	{
@@ -250,6 +254,39 @@ func main() {
 			reports.GET("/auth", h.AuthSuccessReport)
 			reports.GET("/nas", h.NASUsageReport)
 			reports.GET("/usage/export", h.ExportUsageReport)
+		}
+
+		// ── Tier 2 Pro: User Plans ────────────────────────────────────────────
+		plans := protected.Group("plans")
+		{
+			plans.GET("", middleware.RequireRole("operator", "admin", "super_admin"), h.ListPlans)
+			plans.POST("", middleware.RequireRole("admin", "super_admin"), h.CreatePlan)
+			plans.PUT("/:id", middleware.RequireRole("admin", "super_admin"), h.UpdatePlan)
+			plans.DELETE("/:id", middleware.RequireRole("admin", "super_admin"), h.DeletePlan)
+		}
+		protected.POST("radius/users/:id/plan", middleware.RequireRole("admin", "super_admin"), h.AssignPlan)
+
+		// ── Tier 2 Pro: Billing / Invoices ────────────────────────────────────
+		billing := protected.Group("invoices")
+		{
+			billing.GET("", middleware.RequireRole("operator", "admin", "super_admin"), h.ListInvoices)
+			billing.POST("", middleware.RequireRole("admin", "super_admin"), h.CreateInvoice)
+			billing.PUT("/:id", middleware.RequireRole("admin", "super_admin"), h.UpdateInvoice)
+			billing.DELETE("/:id", middleware.RequireRole("admin", "super_admin"), h.DeleteInvoice)
+		}
+
+		// ── Tier 2 Pro: NAS Monitor ───────────────────────────────────────────
+		protected.GET("nas/status", middleware.RequireRole("operator", "admin", "super_admin"), h.GetNASStatus)
+		protected.POST("nas/:id/ping", middleware.RequireRole("admin", "super_admin"), h.PingNASNow)
+
+		// ── Tier 2 Pro: Alert Rules ───────────────────────────────────────────
+		alerts := protected.Group("alerts")
+		{
+			alerts.GET("", middleware.RequireRole("admin", "super_admin"), h.ListAlertRules)
+			alerts.POST("", middleware.RequireRole("super_admin"), h.CreateAlertRule)
+			alerts.PUT("/:id", middleware.RequireRole("super_admin"), h.UpdateAlertRule)
+			alerts.DELETE("/:id", middleware.RequireRole("super_admin"), h.DeleteAlertRule)
+			alerts.POST("/test-email", middleware.RequireRole("super_admin"), h.SendTestEmail)
 		}
 	}
 

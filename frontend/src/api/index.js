@@ -198,4 +198,37 @@ export const reportsAPI = {
   exportUsage: (params) => api.get('/reports/usage/export', { params, responseType: 'blob' }),
 }
 
+// ── Tier 2 Pro: User Plans ────────────────────────────────────────────────
+export const plansAPI = {
+  list: () => api.get('/plans'),
+  create: (data) => api.post('/plans', data),
+  update: (id, data) => api.put(`/plans/${id}`, data),
+  delete: (id) => api.delete(`/plans/${id}`),
+  assignToUser: (userId, planId) => api.post(`/radius/users/${userId}/plan`, { plan_id: planId }),
+}
+
+// ── Tier 2 Pro: Billing ───────────────────────────────────────────────────
+export const billingAPI = {
+  list: (params) => api.get('/invoices', { params }),
+  create: (data) => api.post('/invoices', data),
+  update: (id, data) => api.put(`/invoices/${id}`, data),
+  delete: (id) => api.delete(`/invoices/${id}`),
+}
+
+// ── Tier 2 Pro: NAS Status ────────────────────────────────────────────────
+// nasAPI extended with status + ping
+export const nasStatusAPI = {
+  status: () => api.get('/nas/status'),
+  pingNow: (id) => api.post(`/nas/${id}/ping`),
+}
+
+// ── Tier 2 Pro: Alert Rules ───────────────────────────────────────────────
+export const alertsAPI = {
+  list: () => api.get('/alerts'),
+  create: (data) => api.post('/alerts', data),
+  update: (id, data) => api.put(`/alerts/${id}`, data),
+  delete: (id) => api.delete(`/alerts/${id}`),
+  testEmail: (data) => api.post('/alerts/test-email', data),
+}
+
 export default api

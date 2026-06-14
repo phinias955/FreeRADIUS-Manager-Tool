@@ -53,6 +53,24 @@
 
         <template v-if="authStore.isAdmin || authStore.isSuperAdmin">
           <div class="pt-4 pb-2">
+            <p class="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Business</p>
+          </div>
+          <router-link to="/plans" class="sidebar-link" active-class="active">
+            <CurrencyDollarIcon class="w-5 h-5 flex-shrink-0" />
+            User Plans
+          </router-link>
+          <router-link to="/billing" class="sidebar-link" active-class="active">
+            <DocumentTextIcon class="w-5 h-5 flex-shrink-0" />
+            Billing
+          </router-link>
+          <router-link to="/alerts" class="sidebar-link" active-class="active">
+            <BellAlertIcon class="w-5 h-5 flex-shrink-0" />
+            Alert Rules
+          </router-link>
+        </template>
+
+        <template v-if="authStore.isAdmin || authStore.isSuperAdmin">
+          <div class="pt-4 pb-2">
             <p class="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Network</p>
           </div>
           <router-link to="/bandwidth" class="sidebar-link" active-class="active">
@@ -156,6 +174,9 @@ import {
   TicketIcon,
   DocumentChartBarIcon,
   SignalIcon,
+  CurrencyDollarIcon,
+  DocumentTextIcon,
+  BellAlertIcon,
 } from '@heroicons/vue/24/outline'
 
 const authStore = useAuthStore()

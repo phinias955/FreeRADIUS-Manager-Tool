@@ -96,6 +96,17 @@
           <p class="opacity-75">{{ testResults[device.id].message }}</p>
           <p class="opacity-75">Latency: {{ testResults[device.id].latency_ms?.toFixed(1) }}ms</p>
         </div>
+
+        <!-- Live ping badge -->
+        <div class="mt-2 flex items-center gap-2 text-xs" v-if="pingStatus[device.id]">
+          <span class="w-2 h-2 rounded-full"
+            :class="pingStatus[device.id] === 'up' ? 'bg-green-500' : pingStatus[device.id] === 'down' ? 'bg-red-500' : 'bg-gray-400'">
+          </span>
+          <span :class="pingStatus[device.id] === 'up' ? 'text-green-600' : pingStatus[device.id] === 'down' ? 'text-red-500' : 'text-gray-400'">
+            {{ pingStatus[device.id] === 'up' ? 'Online' : pingStatus[device.id] === 'down' ? 'Offline' : 'Unknown' }}
+          </span>
+          <span v-if="pingLatency[device.id]" class="text-gray-400">{{ pingLatency[device.id].toFixed(0) }}ms</span>
+        </div>
       </div>
     </div>
 
@@ -127,10 +138,10 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useAuthStore } from '@/store/auth'
 import { useToast } from 'vue-toastification'
-import { nasAPI } from '@/api'
+import { nasAPI, nasStatusAPI } from '@/api'
 import { PlusIcon, PencilIcon, TrashIcon, ServerIcon, SignalIcon, MagnifyingGlassIcon } from '@heroicons/vue/24/outline'
 import NASModal from '@/components/nas/NASModal.vue'
 import DiscoverModal from '@/components/nas/DiscoverModal.vue'
@@ -142,10 +153,13 @@ const devices = ref([])
 const loading = ref(false)
 const testing = ref(null)
 const testResults = ref({})
+const pingStatus = ref({})
+const pingLatency = ref({})
 const showModal = ref(false)
 const showDiscover = ref(false)
 const showDeleteConfirm = ref(false)
 const editingDevice = ref(null)
+let pingTimer
 
 const templates = [
   { name: 'MikroTik', desc: 'RouterOS devices', type: 'other', ports: 1812 },
@@ -199,6 +213,16 @@ async function deleteDevice() {
 function onSaved() { showModal.value = false; loadDevices() }
 function addDiscovered(ip) { showDiscover.value = false; editingDevice.value = { nasname: ip }; showModal.value = true }
 
+async function loadPingStatus() {
+  try {
+    const { data } = await nasStatusAPI.status()
+    ;(data.data || []).forEach(d => {
+      pingStatus.value[d.id] = d.ping_status
+      pingLatency.value[d.id] = d.ping_latency_ms
+    })
+  } catch { /* silent */ }
+}
+
 function deviceIconBg(type) {
   return { cisco: 'bg-blue-100', other: 'bg-gray-100' }[type] || 'bg-gray-100'
 }
@@ -206,5 +230,10 @@ function deviceIconColor(type) {
   return { cisco: 'text-blue-600', other: 'text-gray-600' }[type] || 'text-gray-600'
 }
 
-onMounted(loadDevices)
+onMounted(() => {
+  loadDevices()
+  loadPingStatus()
+  pingTimer = setInterval(loadPingStatus, 60000)
+})
+onUnmounted(() => clearInterval(pingTimer))
 </script>
