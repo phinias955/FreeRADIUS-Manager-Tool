@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
-	"strings"
+	strs "strings"
 	"time"
 
 	"github.com/freeradius-manager/backend/internal/auth"
@@ -22,46 +22,52 @@ func (h *Handler) ListRadiusUsers(c *gin.Context) {
 	status := c.Query("status")
 	department := c.Query("department")
 
-	query := `
-		SELECT ru.id, ru.username, ru.email, ru.full_name, ru.department,
-		       ru.status, ru.device_limit, ru.account_expiry, ru.password_expiry,
-		       ru.force_password_change, ru.created_by, au.username as created_by_username,
-		       ru.created_at, ru.updated_at,
-		       COUNT(ra.radacctid) FILTER (WHERE ra.acctstoptime IS NULL) as active_sessions
-		FROM radius_users ru
-		LEFT JOIN app_users au ON au.id = ru.created_by
-		LEFT JOIN radacct ra ON ra.username = ru.username
-		WHERE 1=1`
-
-	args := []interface{}{}
+	// Build WHERE clause and shared args
+	where := "WHERE 1=1"
+	filterArgs := []interface{}{}
 	argN := 1
 
 	if search != "" {
-		query += fmt.Sprintf(` AND (ru.username ILIKE $%d OR ru.email ILIKE $%d OR ru.full_name ILIKE $%d)`, argN, argN, argN)
-		args = append(args, "%"+search+"%")
+		where += fmt.Sprintf(
+			` AND (ru.username ILIKE $%d OR ru.email ILIKE $%d OR ru.full_name ILIKE $%d)`,
+			argN, argN, argN,
+		)
+		filterArgs = append(filterArgs, "%"+search+"%")
 		argN++
 	}
 	if status != "" {
-		query += fmt.Sprintf(` AND ru.status = $%d`, argN)
-		args = append(args, status)
+		where += fmt.Sprintf(` AND ru.status = $%d`, argN)
+		filterArgs = append(filterArgs, status)
 		argN++
 	}
 	if department != "" {
-		query += fmt.Sprintf(` AND ru.department ILIKE $%d`, argN)
-		args = append(args, "%"+department+"%")
+		where += fmt.Sprintf(` AND ru.department ILIKE $%d`, argN)
+		filterArgs = append(filterArgs, "%"+department+"%")
 		argN++
 	}
 
-	countQuery := strings.Replace(query, `ru.id, ru.username, ru.email, ru.full_name, ru.department,
+	// Count query
+	countSQL := fmt.Sprintf(`SELECT COUNT(*) FROM radius_users ru %s`, where)
+	var total int
+	h.db.QueryRow(countSQL, filterArgs...).Scan(&total)
+
+	// Data query
+	dataArgs := append(filterArgs, limit, offset)
+	dataSQL := fmt.Sprintf(`
+		SELECT ru.id, ru.username, ru.email, ru.full_name, ru.department,
 		       ru.status, ru.device_limit, ru.account_expiry, ru.password_expiry,
-		       ru.force_password_change, ru.created_by, au.username as created_by_username,
+		       ru.force_password_change, ru.created_by, au.username,
 		       ru.created_at, ru.updated_at,
-		       COUNT(ra.radacctid) FILTER (WHERE ra.acctstoptime IS NULL) as active_sessions`, "COUNT(*)", 1)
+		       COUNT(ra.radacctid) FILTER (WHERE ra.acctstoptime IS NULL)
+		FROM radius_users ru
+		LEFT JOIN app_users au ON au.id = ru.created_by
+		LEFT JOIN radacct ra ON ra.username = ru.username
+		%s
+		GROUP BY ru.id, au.username
+		ORDER BY ru.created_at DESC
+		LIMIT $%d OFFSET $%d`, where, argN, argN+1)
 
-	query += fmt.Sprintf(` GROUP BY ru.id, au.username ORDER BY ru.created_at DESC LIMIT $%d OFFSET $%d`, argN, argN+1)
-	args = append(args, limit, offset)
-
-	rows, err := h.db.Query(query, args...)
+	rows, err := h.db.Query(dataSQL, dataArgs...)
 	if err != nil {
 		h.log.WithError(err).Error("list radius users query failed")
 		respondError(c, http.StatusInternalServerError, "failed to fetch users")
@@ -85,11 +91,6 @@ func (h *Handler) ListRadiusUsers(c *gin.Context) {
 		u.CreatedByUsername = createdByUsername.String
 		users = append(users, u)
 	}
-
-	// Count total (without pagination)
-	countArgs := args[:len(args)-2]
-	var total int
-	h.db.QueryRow(countQuery, countArgs...).Scan(&total)
 
 	c.JSON(http.StatusOK, gin.H{
 		"data":  users,
@@ -574,12 +575,12 @@ func (h *Handler) ImportRadiusUsers(c *gin.Context) {
 			errors = append(errors, fmt.Sprintf("row %d: insufficient columns (need username,password,email)", i+2))
 			continue
 		}
-		username := strings.TrimSpace(row[0])
-		password := strings.TrimSpace(row[1])
-		email := strings.TrimSpace(row[2])
+		username := strs.TrimSpace(row[0])
+		password := strs.TrimSpace(row[1])
+		email := strs.TrimSpace(row[2])
 		fullName := ""
 		if len(row) > 3 {
-			fullName = strings.TrimSpace(row[3])
+			fullName = strs.TrimSpace(row[3])
 		}
 
 		if err := auth.ValidatePasswordComplexity(password); err != nil {

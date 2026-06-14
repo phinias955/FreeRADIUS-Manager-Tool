@@ -11,7 +11,6 @@ require (
 	github.com/pquerna/otp v1.4.0
 	github.com/sirupsen/logrus v1.9.3
 	golang.org/x/crypto v0.21.0
-	layeh.com/radius v0.0.0-20231213012101-be3a087e2aa1
 )
 
 require (

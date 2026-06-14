@@ -2,7 +2,10 @@ package handlers
 
 import (
 	"context"
+	"crypto/md5"
+	"crypto/rand"
 	"database/sql"
+	"encoding/binary"
 	"fmt"
 	"net"
 	"net/http"
@@ -13,8 +16,6 @@ import (
 
 	"github.com/freeradius-manager/backend/internal/models"
 	"github.com/gin-gonic/gin"
-	"layeh.com/radius"
-	"layeh.com/radius/rfc2865"
 )
 
 // ListNAS returns all NAS clients.
@@ -167,7 +168,7 @@ func (h *Handler) DeleteNAS(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "NAS deleted successfully"})
 }
 
-// TestNAS sends a test RADIUS packet to verify the NAS is reachable.
+// TestNAS sends a test RADIUS Access-Request to the stored NAS device.
 func (h *Handler) TestNAS(c *gin.Context) {
 	id, err := mustInt(c, "id")
 	if err != nil {
@@ -185,11 +186,11 @@ func (h *Handler) TestNAS(c *gin.Context) {
 		return
 	}
 
-	result := sendTestRadius(c.Request.Context(), nasName, secret)
+	result := sendTestRADIUS(nasName, secret, getRadiusPort())
 	c.JSON(http.StatusOK, result)
 }
 
-// TestRADIUS tests authentication against the FreeRADIUS server.
+// TestRADIUS tests authentication of a given username/password against FreeRADIUS.
 func (h *Handler) TestRADIUS(c *gin.Context) {
 	var req struct {
 		Username string `json:"username" binding:"required"`
@@ -218,40 +219,38 @@ func (h *Handler) TestRADIUS(c *gin.Context) {
 	start := time.Now()
 	addr := fmt.Sprintf("%s:%d", nasName, port)
 
-	packet := radius.New(radius.CodeAccessRequest, []byte(secret))
-	rfc2865.UserName_SetString(packet, req.Username)
-	rfc2865.UserPassword_SetString(packet, req.Password)
-	rfc2865.NASIPAddress_Set(packet, net.ParseIP("127.0.0.1"))
-
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
-	defer cancel()
-
-	response, err := radius.Exchange(ctx, packet, addr)
+	packet := buildAccessRequest(req.Username, req.Password, secret)
+	response, err := sendRADIUSPacket(c.Request.Context(), addr, packet, 5*time.Second)
 	latency := time.Since(start)
 
 	if err != nil {
 		c.JSON(http.StatusOK, models.NASTestResult{
-			Success:   false,
-			Message:   fmt.Sprintf("connection failed: %v", err),
-			LatencyMs: float64(latency.Milliseconds()),
-			NASName:   nasName,
+			Success:    false,
+			Message:    fmt.Sprintf("connection failed: %v", err),
+			LatencyMs:  float64(latency.Milliseconds()),
+			NASName:    nasName,
 			RadiusPort: port,
 		})
 		return
 	}
 
-	success := response.Code == radius.CodeAccessAccept
+	// Code 2 = Access-Accept, Code 3 = Access-Reject
+	success := len(response) > 0 && response[0] == 2
 	msg := "Access-Accept"
 	if !success {
-		msg = fmt.Sprintf("Access-Reject (code %d)", response.Code)
+		if len(response) > 0 {
+			msg = fmt.Sprintf("Access-Reject (code %d)", response[0])
+		} else {
+			msg = "No response"
+		}
 	}
 
 	c.JSON(http.StatusOK, models.NASTestResult{
-		Success:   success,
-		Message:   msg,
-		LatencyMs: float64(latency.Milliseconds()),
-		AuthTime:  float64(latency.Milliseconds()),
-		NASName:   nasName,
+		Success:    success,
+		Message:    msg,
+		LatencyMs:  float64(latency.Milliseconds()),
+		AuthTime:   float64(latency.Milliseconds()),
+		NASName:    nasName,
 		RadiusPort: port,
 	})
 }
@@ -275,16 +274,17 @@ func (h *Handler) DiscoverNAS(c *gin.Context) {
 		secret = "testing123"
 	}
 
+	port := getRadiusPort()
 	discovered := []gin.H{}
 	count := 0
+
 	for ip := cloneIP(ipNet.IP.Mask(ipNet.Mask)); ipNet.Contains(ip); incrementIP(ip) {
 		if count >= 254 {
 			break
 		}
 		count++
 		ipStr := ip.String()
-
-		result := sendTestRadius(c.Request.Context(), ipStr, secret)
+		result := sendTestRADIUS(ipStr, secret, port)
 		if result.Success {
 			discovered = append(discovered, gin.H{
 				"ip":        ipStr,
@@ -301,20 +301,118 @@ func (h *Handler) DiscoverNAS(c *gin.Context) {
 	})
 }
 
-func sendTestRadius(ctx context.Context, nasIP, secret string) models.NASTestResult {
-	port := getRadiusPort()
+// ─── RADIUS packet helpers (pure Go, no external library) ────────────────────
+
+// buildAccessRequest constructs a minimal RADIUS Access-Request packet.
+func buildAccessRequest(username, password, secret string) []byte {
+	// Random authenticator (16 bytes)
+	authenticator := make([]byte, 16)
+	rand.Read(authenticator)
+
+	// Random identifier
+	idByte := make([]byte, 1)
+	rand.Read(idByte)
+	id := idByte[0]
+
+	// Encode User-Password: RFC 2865 §5.2
+	encPw := encodePassword(password, secret, authenticator)
+
+	// Build attributes
+	attrs := []byte{}
+
+	// User-Name attribute (type=1)
+	attrs = appendAttr(attrs, 1, []byte(username))
+	// User-Password attribute (type=2)
+	attrs = appendAttr(attrs, 2, encPw)
+	// NAS-IP-Address attribute (type=4) — use 127.0.0.1
+	nasIP := net.ParseIP("127.0.0.1").To4()
+	attrs = appendAttr(attrs, 4, nasIP)
+
+	// Total length = 20 (header) + len(attrs)
+	totalLen := uint16(20 + len(attrs))
+	packet := make([]byte, 20)
+	packet[0] = 1 // Code: Access-Request
+	packet[1] = id
+	binary.BigEndian.PutUint16(packet[2:4], totalLen)
+	copy(packet[4:20], authenticator)
+	packet = append(packet, attrs...)
+
+	return packet
+}
+
+// encodePassword encodes the User-Password per RFC 2865 §5.2.
+func encodePassword(password, secret string, authenticator []byte) []byte {
+	pw := []byte(password)
+	// Pad to multiple of 16 bytes
+	for len(pw)%16 != 0 {
+		pw = append(pw, 0)
+	}
+	if len(pw) == 0 {
+		pw = make([]byte, 16)
+	}
+
+	result := make([]byte, len(pw))
+	prev := authenticator
+	for i := 0; i < len(pw); i += 16 {
+		h := md5.New()
+		h.Write([]byte(secret))
+		h.Write(prev)
+		b := h.Sum(nil)
+		for j := 0; j < 16; j++ {
+			result[i+j] = pw[i+j] ^ b[j]
+		}
+		prev = result[i : i+16]
+	}
+	return result
+}
+
+// appendAttr appends a RADIUS TLV attribute (type, length, value).
+func appendAttr(buf []byte, attrType byte, value []byte) []byte {
+	buf = append(buf, attrType)
+	buf = append(buf, byte(2+len(value)))
+	buf = append(buf, value...)
+	return buf
+}
+
+// sendRADIUSPacket sends a RADIUS packet over UDP and waits for a response.
+func sendRADIUSPacket(ctx context.Context, addr string, packet []byte, timeout time.Duration) ([]byte, error) {
+	conn, err := net.DialTimeout("udp", addr, timeout)
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+
+	// Set deadline from context or timeout
+	deadline := time.Now().Add(timeout)
+	if d, ok := ctx.Deadline(); ok && d.Before(deadline) {
+		deadline = d
+	}
+	conn.SetDeadline(deadline)
+
+	if _, err := conn.Write(packet); err != nil {
+		return nil, err
+	}
+
+	buf := make([]byte, 4096)
+	n, err := conn.Read(buf)
+	if err != nil {
+		return nil, err
+	}
+
+	return buf[:n], nil
+}
+
+// sendTestRADIUS sends a probe packet and returns a connectivity result.
+// A response (even Access-Reject) means the server is reachable.
+func sendTestRADIUS(nasIP, secret string, port int) models.NASTestResult {
 	addr := fmt.Sprintf("%s:%d", nasIP, port)
 	start := time.Now()
 
-	packet := radius.New(radius.CodeAccessRequest, []byte(secret))
-	rfc2865.UserName_SetString(packet, "connectivity-probe")
-	rfc2865.UserPassword_SetString(packet, "probe-will-reject")
-	rfc2865.NASIPAddress_Set(packet, net.ParseIP("127.0.0.1"))
-
-	tctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	packet := buildAccessRequest("connectivity-probe", "probe-will-reject", secret)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	response, err := radius.Exchange(tctx, packet, addr)
+	response, err := sendRADIUSPacket(ctx, addr, packet, 2*time.Second)
 	latency := time.Since(start)
 
 	if err != nil {
@@ -327,9 +425,14 @@ func sendTestRadius(ctx context.Context, nasIP, secret string) models.NASTestRes
 		}
 	}
 
+	code := "unknown"
+	if len(response) > 0 {
+		code = strconv.Itoa(int(response[0]))
+	}
+
 	return models.NASTestResult{
 		Success:    true,
-		Message:    fmt.Sprintf("RADIUS server responding (code %d)", response.Code),
+		Message:    fmt.Sprintf("RADIUS server responding (code %s)", code),
 		LatencyMs:  float64(latency.Milliseconds()),
 		NASName:    nasIP,
 		RadiusPort: port,

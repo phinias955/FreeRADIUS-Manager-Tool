@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -87,5 +86,3 @@ func mustInt(c *gin.Context, param string) (int, error) {
 	return strconv.Atoi(raw)
 }
 
-// unused prevents import errors while building incrementally
-var _ = fmt.Sprintf

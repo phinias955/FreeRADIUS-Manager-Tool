@@ -1,7 +1,28 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/store/auth'
+import { setupAPI } from '@/api/index'
+
+// Cache setup status so we only check once per page load
+let setupRequired = null
+
+async function checkSetupStatus() {
+  if (setupRequired !== null) return setupRequired
+  try {
+    const { data } = await setupAPI.status()
+    setupRequired = data.setup_required === true
+  } catch {
+    setupRequired = false
+  }
+  return setupRequired
+}
 
 const routes = [
+  {
+    path: '/setup',
+    name: 'Setup',
+    component: () => import('@/views/SetupWizard.vue'),
+    meta: { requiresAuth: false, title: 'Setup Wizard' },
+  },
   {
     path: '/login',
     name: 'Login',
@@ -66,12 +87,24 @@ const router = createRouter({
   routes,
 })
 
-router.beforeEach((to, from, next) => {
+router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
 
   if (to.meta.title) {
     document.title = `${to.meta.title} — FreeRADIUS Manager`
   }
+
+  // Always check setup status first
+  const needsSetup = await checkSetupStatus()
+
+  if (needsSetup) {
+    // Setup not done — only /setup is allowed
+    if (to.name !== 'Setup') return next({ name: 'Setup' })
+    return next()
+  }
+
+  // Setup done — /setup is no longer accessible
+  if (to.name === 'Setup') return next({ name: 'Login' })
 
   if (to.meta.requiresAuth === false) {
     if (authStore.isAuthenticated && to.name === 'Login') {

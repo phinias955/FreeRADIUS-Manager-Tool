@@ -245,19 +245,13 @@ CREATE TRIGGER update_nas_updated_at
 -- DEFAULT DATA
 -- ============================================================
 
--- Default super admin (password: Admin@123456 - CHANGE IMMEDIATELY)
--- bcrypt hash of 'Admin@123456' with cost 12
-INSERT INTO app_users (username, password_hash, email, full_name, role)
-VALUES (
-    'superadmin',
-    '$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj/VK3RQK5cm',
-    'admin@localhost.local',
-    'Super Administrator',
-    'super_admin'
-) ON CONFLICT (username) DO NOTHING;
+-- No default admin user — credentials are created via the Setup Wizard on first launch.
 
 -- Default system settings
 INSERT INTO system_settings (key, value, description) VALUES
+    ('setup_complete',      'false',     'Whether the initial setup wizard has been completed'),
+    ('org_name',            'My Organisation', 'Organisation display name'),
+    ('org_timezone',        'UTC',       'Organisation timezone'),
     ('smtp_host',           '',          'SMTP server hostname'),
     ('smtp_port',           '587',       'SMTP server port'),
     ('smtp_user',           '',          'SMTP username'),

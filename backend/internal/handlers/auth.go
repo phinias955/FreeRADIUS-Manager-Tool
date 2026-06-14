@@ -25,8 +25,9 @@ func (h *Handler) Login(c *gin.Context) {
 	// Fetch user
 	var user models.AppUser
 	err := h.db.QueryRow(`
-		SELECT id, username, password_hash, email, full_name, role,
-		       mfa_enabled, mfa_secret, is_active, failed_attempts, locked_until
+		SELECT id, username, password_hash, email,
+		       COALESCE(full_name, ''), role,
+		       mfa_enabled, COALESCE(mfa_secret, ''), is_active, failed_attempts, locked_until
 		FROM app_users WHERE username = $1`,
 		req.Username,
 	).Scan(

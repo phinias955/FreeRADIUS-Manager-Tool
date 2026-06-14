@@ -67,6 +67,13 @@ func main() {
 	// API v1 routes
 	v1 := router.Group("/api/v1")
 	{
+		// First-run setup wizard endpoints (public, idempotency-guarded)
+		setup := v1.Group("/setup")
+		{
+			setup.GET("/status", h.SetupStatus)
+			setup.POST("/complete", h.SetupComplete)
+		}
+
 		// Auth endpoints (public)
 		auth := v1.Group("/auth")
 		{

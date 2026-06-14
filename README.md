@@ -243,6 +243,10 @@ Before going to production:
 - Default credentials: `superadmin` / `Admin@123456`
 - Reset via SQL: `docker exec -it radius_postgres psql -U radius_user radius -c "UPDATE app_users SET password_hash='...' WHERE username='superadmin'"`
 
+ Web UI: http://localhost:8081
+# Login: superadmin / Admin@123456
+
+
 ## License
 
 MIT — Free to use, modify and deploy.

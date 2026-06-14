@@ -164,4 +164,10 @@ export const healthAPI = {
   check: () => api.get('/health'),
 }
 
+// --- Setup Wizard ---
+export const setupAPI = {
+  status: () => api.get('/setup/status'),
+  complete: (data) => api.post('/setup/complete', data),
+}
+
 export default api

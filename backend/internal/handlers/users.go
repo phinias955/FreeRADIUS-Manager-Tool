@@ -15,7 +15,8 @@ func (h *Handler) ListAdminUsers(c *gin.Context) {
 	offset, limit := paginationParams(c)
 
 	rows, err := h.db.Query(`
-		SELECT id, username, email, full_name, role, mfa_enabled, is_active, last_login, created_at, updated_at
+		SELECT id, username, email, COALESCE(full_name, ''), role,
+		       mfa_enabled, is_active, last_login, created_at, updated_at
 		FROM app_users
 		ORDER BY created_at DESC
 		LIMIT $1 OFFSET $2`,
