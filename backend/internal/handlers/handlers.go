@@ -48,8 +48,8 @@ func HealthCheck(db *database.DB) gin.HandlerFunc {
 func Version() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
-			"version": "1.0.0",
-			"name":    "FreeRADIUS Manager",
+			"version": "2.0.0-pro",
+			"name":    "FreeRADIUS Manager Pro",
 			"build":   time.Now().Format("2006-01-02"),
 		})
 	}

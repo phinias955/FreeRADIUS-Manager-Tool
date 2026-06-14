@@ -218,6 +218,39 @@ func main() {
 		protected.POST("backup", middleware.RequireRole("super_admin"), h.CreateBackup)
 		protected.POST("restore", middleware.RequireRole("super_admin"), h.RestoreBackup)
 		protected.GET("backups", middleware.RequireRole("super_admin"), h.ListBackups)
+
+		// ── Tier 1 Pro: Vouchers ─────────────────────────────────────────────
+		vouchers := protected.Group("vouchers")
+		{
+			vouchers.GET("", middleware.RequireRole("operator", "admin", "super_admin"), h.ListVouchers)
+			vouchers.POST("/generate", middleware.RequireRole("admin", "super_admin"), h.GenerateVouchers)
+			vouchers.GET("/batches", middleware.RequireRole("operator", "admin", "super_admin"), h.GetVoucherBatches)
+			vouchers.POST("/:id/disable", middleware.RequireRole("admin", "super_admin"), h.DisableVoucher)
+			vouchers.DELETE("/:id", middleware.RequireRole("admin", "super_admin"), h.DeleteVoucher)
+			vouchers.GET("/export", middleware.RequireRole("admin", "super_admin"), h.ExportVouchers)
+		}
+
+		// ── Tier 1 Pro: Bandwidth Profiles ───────────────────────────────────
+		bw := protected.Group("bandwidth-profiles")
+		{
+			bw.GET("", middleware.RequireRole("operator", "admin", "super_admin"), h.ListBandwidthProfiles)
+			bw.POST("", middleware.RequireRole("admin", "super_admin"), h.CreateBandwidthProfile)
+			bw.PUT("/:id", middleware.RequireRole("admin", "super_admin"), h.UpdateBandwidthProfile)
+			bw.DELETE("/:id", middleware.RequireRole("admin", "super_admin"), h.DeleteBandwidthProfile)
+		}
+		// Apply bandwidth profile to a RADIUS user
+		protected.POST("radius/users/:id/bandwidth", middleware.RequireRole("admin", "super_admin"), h.ApplyBandwidthProfile)
+
+		// ── Tier 1 Pro: Reports ───────────────────────────────────────────────
+		reports := protected.Group("reports")
+		reports.Use(middleware.RequireRole("operator", "admin", "super_admin"))
+		{
+			reports.GET("/usage", h.UsageReport)
+			reports.GET("/usage/daily", h.DailyUsageReport)
+			reports.GET("/auth", h.AuthSuccessReport)
+			reports.GET("/nas", h.NASUsageReport)
+			reports.GET("/usage/export", h.ExportUsageReport)
+		}
 	}
 
 	port := os.Getenv("WEB_PORT")

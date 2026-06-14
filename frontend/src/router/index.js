@@ -68,6 +68,24 @@ const routes = [
         meta: { title: 'Monitoring', roles: ['operator', 'admin', 'super_admin'] },
       },
       {
+        path: 'vouchers',
+        name: 'Vouchers',
+        component: () => import('@/views/Vouchers.vue'),
+        meta: { title: 'Vouchers', roles: ['operator', 'admin', 'super_admin'] },
+      },
+      {
+        path: 'bandwidth',
+        name: 'Bandwidth',
+        component: () => import('@/views/BandwidthProfiles.vue'),
+        meta: { title: 'Bandwidth Profiles', roles: ['admin', 'super_admin'] },
+      },
+      {
+        path: 'reports',
+        name: 'Reports',
+        component: () => import('@/views/Reports.vue'),
+        meta: { title: 'Reports', roles: ['operator', 'admin', 'super_admin'] },
+      },
+      {
         path: 'admin-users',
         name: 'AdminUsers',
         component: () => import('@/views/AdminUsers.vue'),

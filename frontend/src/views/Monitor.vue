@@ -56,11 +56,12 @@
                 <th>Duration</th>
                 <th>Data</th>
                 <th>Port</th>
+                <th>Action</th>
               </tr>
             </thead>
             <tbody>
               <tr v-if="!sessions.data?.length">
-                <td colspan="8" class="text-center text-gray-400 py-12">No active sessions</td>
+                <td colspan="9" class="text-center text-gray-400 py-12">No active sessions</td>
               </tr>
               <tr v-for="s in sessions.data" :key="s.session_id">
                 <td class="font-medium text-gray-900">{{ s.username }}</td>
@@ -71,6 +72,11 @@
                 <td class="text-gray-500">{{ formatDuration(s.duration_seconds) }}</td>
                 <td class="text-gray-500 text-xs">{{ formatBytes(s.input_bytes + s.output_bytes) }}</td>
                 <td class="text-gray-400 text-xs">{{ s.nas_port || '—' }}</td>
+                <td>
+                  <button @click="disconnectSession(s)" class="text-xs px-2 py-1 rounded bg-red-100 text-red-600 hover:bg-red-200">
+                    Kick
+                  </button>
+                </td>
               </tr>
             </tbody>
           </table>
@@ -172,7 +178,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { dashboardAPI } from '@/api'
+import { dashboardAPI, radiusUsersAPI } from '@/api'
 import { format, parseISO } from 'date-fns'
 import { ArrowPathIcon, MagnifyingGlassIcon } from '@heroicons/vue/24/outline'
 import { useToast } from 'vue-toastification'
@@ -222,6 +228,21 @@ async function loadAll() {
   loading.value = true
   await Promise.all([loadSessions(), loadLogs(), loadAuditLogs()])
   loading.value = false
+}
+
+async function disconnectSession(session) {
+  if (!confirm(`Disconnect user "${session.username}"?`)) return
+  try {
+    // Look up user by username to get their ID, then call disconnect
+    const { data: usersData } = await radiusUsersAPI.list({ search: session.username, limit: 5 })
+    const user = (usersData.data || []).find(u => u.username === session.username)
+    if (!user) { toast.error('User not found'); return }
+    await radiusUsersAPI.disconnect(user.id)
+    toast.success(`${session.username} disconnected`)
+    loadSessions()
+  } catch (err) {
+    toast.error(err.response?.data?.error || 'Disconnect failed')
+  }
 }
 
 function formatDate(dateStr) {

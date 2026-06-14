@@ -14,8 +14,8 @@
           </svg>
         </div>
         <div>
-          <div class="font-bold text-gray-900 text-sm leading-tight">RADIUS Manager</div>
-          <div class="text-xs text-gray-500">v1.0.0</div>
+          <div class="font-bold text-gray-900 text-sm leading-tight">RADIUS Manager Pro</div>
+          <div class="text-xs text-blue-600 font-medium">v2.0 Pro</div>
         </div>
       </div>
 
@@ -40,6 +40,26 @@
           <ChartBarIcon class="w-5 h-5 flex-shrink-0" />
           Monitoring
         </router-link>
+
+        <router-link to="/vouchers" class="sidebar-link" active-class="active">
+          <TicketIcon class="w-5 h-5 flex-shrink-0" />
+          Vouchers
+        </router-link>
+
+        <router-link to="/reports" class="sidebar-link" active-class="active">
+          <DocumentChartBarIcon class="w-5 h-5 flex-shrink-0" />
+          Reports
+        </router-link>
+
+        <template v-if="authStore.isAdmin || authStore.isSuperAdmin">
+          <div class="pt-4 pb-2">
+            <p class="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Network</p>
+          </div>
+          <router-link to="/bandwidth" class="sidebar-link" active-class="active">
+            <SignalIcon class="w-5 h-5 flex-shrink-0" />
+            Bandwidth Profiles
+          </router-link>
+        </template>
 
         <template v-if="authStore.isSuperAdmin">
           <div class="pt-4 pb-2">
@@ -133,6 +153,9 @@ import {
   ShieldCheckIcon,
   CogIcon,
   ArrowRightOnRectangleIcon,
+  TicketIcon,
+  DocumentChartBarIcon,
+  SignalIcon,
 } from '@heroicons/vue/24/outline'
 
 const authStore = useAuthStore()

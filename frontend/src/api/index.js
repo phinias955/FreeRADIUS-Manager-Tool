@@ -170,4 +170,32 @@ export const setupAPI = {
   complete: (data) => api.post('/setup/complete', data),
 }
 
+// ── Tier 1 Pro: Vouchers ──────────────────────────────────────────────────
+export const voucherAPI = {
+  list: (params) => api.get('/vouchers', { params }),
+  generate: (data) => api.post('/vouchers/generate', data),
+  batches: () => api.get('/vouchers/batches'),
+  disable: (id) => api.post(`/vouchers/${id}/disable`),
+  delete: (id) => api.delete(`/vouchers/${id}`),
+  export: (params) => api.get('/vouchers/export', { params, responseType: 'blob' }),
+}
+
+// ── Tier 1 Pro: Bandwidth Profiles ───────────────────────────────────────
+export const bandwidthAPI = {
+  list: () => api.get('/bandwidth-profiles'),
+  create: (data) => api.post('/bandwidth-profiles', data),
+  update: (id, data) => api.put(`/bandwidth-profiles/${id}`, data),
+  delete: (id) => api.delete(`/bandwidth-profiles/${id}`),
+  applyToUser: (userId, profileId) => api.post(`/radius/users/${userId}/bandwidth`, { profile_id: profileId }),
+}
+
+// ── Tier 1 Pro: Reports ───────────────────────────────────────────────────
+export const reportsAPI = {
+  usage: (params) => api.get('/reports/usage', { params }),
+  daily: (params) => api.get('/reports/usage/daily', { params }),
+  auth: (params) => api.get('/reports/auth', { params }),
+  nas: (params) => api.get('/reports/nas', { params }),
+  exportUsage: (params) => api.get('/reports/usage/export', { params, responseType: 'blob' }),
+}
+
 export default api

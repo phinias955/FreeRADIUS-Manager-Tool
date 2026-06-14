@@ -272,3 +272,62 @@ ON CONFLICT (key) DO NOTHING;
 INSERT INTO nas (nasname, shortname, type, secret, description)
 VALUES ('127.0.0.1', 'localhost', 'other', 'testing123', 'Local test NAS client (update secret to match RADIUS_SECRET)')
 ON CONFLICT (nasname) DO NOTHING;
+
+-- ============================================================
+-- BANDWIDTH PROFILES  (Tier 1 Pro feature)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS bandwidth_profiles (
+    id                  SERIAL PRIMARY KEY,
+    name                VARCHAR(100) UNIQUE NOT NULL,
+    description         TEXT,
+    upload_kbps         INTEGER NOT NULL DEFAULT 1024,
+    download_kbps       INTEGER NOT NULL DEFAULT 2048,
+    burst_upload_kbps   INTEGER DEFAULT 0,
+    burst_download_kbps INTEGER DEFAULT 0,
+    mikrotik_rate_limit VARCHAR(100),
+    is_active           BOOLEAN  DEFAULT TRUE,
+    created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+ALTER TABLE radius_users
+    ADD COLUMN IF NOT EXISTS bandwidth_profile_id INTEGER REFERENCES bandwidth_profiles(id) ON DELETE SET NULL;
+
+CREATE TRIGGER update_bandwidth_profiles_updated_at
+    BEFORE UPDATE ON bandwidth_profiles
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Default speed profiles
+INSERT INTO bandwidth_profiles (name, description, upload_kbps, download_kbps, mikrotik_rate_limit) VALUES
+    ('Basic 1M/2M',    'Basic plan — 1 Mbps up / 2 Mbps down',      1024,  2048,  '1M/2M'),
+    ('Standard 5M/10M','Standard plan — 5 Mbps up / 10 Mbps down',   5120,  10240, '5M/10M'),
+    ('Premium 10M/20M','Premium plan — 10 Mbps up / 20 Mbps down',   10240, 20480, '10M/20M'),
+    ('Business 20M/50M','Business plan — 20 Mbps up / 50 Mbps down', 20480, 51200, '20M/50M')
+ON CONFLICT (name) DO NOTHING;
+
+-- ============================================================
+-- VOUCHERS  (Tier 1 Pro feature)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS vouchers (
+    id                  SERIAL PRIMARY KEY,
+    code                VARCHAR(32) UNIQUE NOT NULL,
+    batch_name          VARCHAR(100),
+    status              VARCHAR(20) DEFAULT 'active'
+                            CHECK (status IN ('active', 'used', 'expired', 'disabled')),
+    data_limit_mb       BIGINT,
+    time_limit_minutes  INTEGER,
+    valid_days          INTEGER DEFAULT 30,
+    expires_at          TIMESTAMP,
+    redeemed_by         VARCHAR(100),
+    redeemed_at         TIMESTAMP,
+    created_by          INTEGER REFERENCES app_users(id) ON DELETE SET NULL,
+    created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS vouchers_code    ON vouchers (code);
+CREATE INDEX IF NOT EXISTS vouchers_status  ON vouchers (status);
+CREATE INDEX IF NOT EXISTS vouchers_batch   ON vouchers (batch_name);
+
+CREATE TRIGGER update_vouchers_updated_at
+    BEFORE UPDATE ON vouchers
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
