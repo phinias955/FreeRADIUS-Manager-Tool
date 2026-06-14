@@ -110,8 +110,8 @@
         </template>
       </div>
 
-      <p class="text-center text-blue-200 text-sm mt-6">
-        Default credentials: <span class="font-mono font-semibold text-white">superadmin / Admin@123456</span>
+      <p class="text-center text-blue-200/60 text-xs mt-6">
+        Secured by FreeRADIUS &amp; JWT authentication
       </p>
     </div>
   </div>
