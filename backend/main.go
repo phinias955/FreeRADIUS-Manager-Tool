@@ -156,6 +156,14 @@ func main() {
 			auth.POST("/mfa/verify", middleware.RequireAuth(), h.MFAVerify)
 		}
 
+		// ── Tier 4 Pro: User Self-Service Portal (public, no JWT) ────────────
+		portal := v1.Group("/portal")
+		{
+			portal.POST("/login", h.PortalLogin)
+			portal.POST("/logout", h.PortalLogout)
+			portal.GET("/dashboard", h.PortalAuthMiddleware(), h.PortalDashboard)
+		}
+
 		// Protected routes
 		protected := v1.Group("/")
 		protected.Use(middleware.RequireAuth())
@@ -322,6 +330,30 @@ func main() {
 
 		// ── Tier 3 Pro: Bulk Import / Export (replaces existing handlers) ────
 		// NOTE: routes already registered above as radius/users/import & export
+
+		// ── Tier 4 Pro: Hotspot Zones ─────────────────────────────────────────
+		zones := protected.Group("zones")
+		{
+			zones.GET("", middleware.RequireRole("operator", "admin", "super_admin"), h.ListZones)
+			zones.POST("", middleware.RequireRole("admin", "super_admin"), h.CreateZone)
+			zones.PUT("/:id", middleware.RequireRole("admin", "super_admin"), h.UpdateZone)
+			zones.DELETE("/:id", middleware.RequireRole("admin", "super_admin"), h.DeleteZone)
+			zones.GET("/:id/stats", middleware.RequireRole("operator", "admin", "super_admin"), h.ZoneStats)
+		}
+		protected.POST("zones/assign-nas", middleware.RequireRole("admin", "super_admin"), h.AssignNASToZone)
+
+		// ── Tier 4 Pro: Live Stats SSE ────────────────────────────────────────
+		protected.GET("live/stats", middleware.RequireRole("operator", "admin", "super_admin"), h.LiveStats)
+		protected.GET("live/stats/current", middleware.RequireRole("operator", "admin", "super_admin"), h.GetCurrentStats)
+
+		// ── Tier 4 Pro: SMS ───────────────────────────────────────────────────
+		smsGroup := protected.Group("sms")
+		{
+			smsGroup.POST("/send", middleware.RequireRole("admin", "super_admin"), h.SendSMS)
+			smsGroup.GET("/logs", middleware.RequireRole("admin", "super_admin"), h.ListSMSLogs)
+			smsGroup.POST("/notify-expiry", middleware.RequireRole("admin", "super_admin"), h.NotifyUserExpiry)
+			smsGroup.GET("/config", middleware.RequireRole("super_admin"), h.SMSConfig)
+		}
 	}
 
 	port := os.Getenv("WEB_PORT")
@@ -344,7 +376,7 @@ func main() {
 		}
 	}()
 
-	// Graceful shutdown
+	// Graceful shutdown 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit

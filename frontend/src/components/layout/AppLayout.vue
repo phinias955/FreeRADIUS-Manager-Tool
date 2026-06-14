@@ -81,6 +81,14 @@
             <CircleStackIcon class="w-5 h-5 flex-shrink-0" />
             IP Pools
           </router-link>
+          <router-link to="/zones" class="sidebar-link" active-class="active">
+            <MapPinIcon class="w-5 h-5 flex-shrink-0" />
+            Hotspot Zones
+          </router-link>
+          <router-link to="/network-map" class="sidebar-link" active-class="active">
+            <GlobeAltIcon class="w-5 h-5 flex-shrink-0" />
+            Network Map
+          </router-link>
         </template>
 
         <template v-if="authStore.isSuperAdmin">
@@ -94,6 +102,10 @@
           <router-link to="/api-keys" class="sidebar-link" active-class="active">
             <KeyIcon class="w-5 h-5 flex-shrink-0" />
             API Keys
+          </router-link>
+          <router-link to="/sms" class="sidebar-link" active-class="active">
+            <DevicePhoneMobileIcon class="w-5 h-5 flex-shrink-0" />
+            SMS Alerts
           </router-link>
           
           <router-link to="/admin-users" class="sidebar-link" active-class="active">
@@ -192,6 +204,9 @@ import {
   CircleStackIcon,
   ClockIcon,
   KeyIcon,
+  MapPinIcon,
+  GlobeAltIcon,
+  DevicePhoneMobileIcon,
 } from '@heroicons/vue/24/outline'
 
 const authStore = useAuthStore()

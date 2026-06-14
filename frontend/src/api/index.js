@@ -266,4 +266,31 @@ export const importAPI = {
   exportCSV: () => api.get('/radius/users/export', { responseType: 'blob' }),
 }
 
+// ── Tier 4 Pro: Hotspot Zones ─────────────────────────────────────────────
+export const zonesAPI = {
+  list: () => api.get('/zones'),
+  create: (data) => api.post('/zones', data),
+  update: (id, data) => api.put(`/zones/${id}`, data),
+  delete: (id) => api.delete(`/zones/${id}`),
+  stats: (id) => api.get(`/zones/${id}/stats`),
+  assignNAS: (data) => api.post('/zones/assign-nas', data),
+}
+
+// ── Tier 4 Pro: SMS ───────────────────────────────────────────────────────
+export const smsAPI = {
+  send: (data) => api.post('/sms/send', data),
+  logs: (params) => api.get('/sms/logs', { params }),
+  notifyExpiry: (data) => api.post('/sms/notify-expiry', data),
+  config: () => api.get('/sms/config'),
+}
+
+// ── Tier 4 Pro: Live Stats (SSE helper) ───────────────────────────────────
+export const liveStatsAPI = {
+  current: () => api.get('/live/stats/current'),
+  createEventSource: () => {
+    const token = localStorage.getItem('access_token') || ''
+    return new EventSource(`/api/v1/live/stats?token=${encodeURIComponent(token)}`)
+  },
+}
+
 export default api

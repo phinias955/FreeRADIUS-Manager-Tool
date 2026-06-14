@@ -12,10 +12,18 @@ const (
 	claimsKey = "claims"
 )
 
-// RequireAuth validates the Bearer JWT from the Authorization header.
+// RequireAuth validates the Bearer JWT from the Authorization header or ?token= query param (for SSE).
 func RequireAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		header := c.GetHeader("Authorization")
+
+		// Allow token via query parameter for SSE (EventSource can't set headers)
+		if header == "" {
+			if t := c.Query("token"); t != "" {
+				header = "Bearer " + t
+			}
+		}
+
 		if header == "" {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "authorization header required"})
 			return
