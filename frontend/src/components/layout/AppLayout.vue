@@ -91,6 +91,25 @@
           </router-link>
         </template>
 
+        <!-- CRM -->
+        <template v-if="authStore.isAdmin || authStore.isSuperAdmin">
+          <div class="pt-4 pb-2">
+            <p class="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">CRM</p>
+          </div>
+          <router-link to="/customers" class="sidebar-link" active-class="active">
+            <UserGroupIcon class="w-5 h-5 flex-shrink-0" />
+            Customers
+          </router-link>
+          <router-link to="/tickets" class="sidebar-link" active-class="active">
+            <TicketIconOutline class="w-5 h-5 flex-shrink-0" />
+            Tickets
+          </router-link>
+          <router-link to="/organizations" class="sidebar-link" active-class="active">
+            <BuildingOffice2Icon class="w-5 h-5 flex-shrink-0" />
+            Organizations
+          </router-link>
+        </template>
+
         <template v-if="authStore.isSuperAdmin">
           <div class="pt-4 pb-2">
             <p class="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">System</p>
@@ -106,6 +125,14 @@
           <router-link to="/sms" class="sidebar-link" active-class="active">
             <DevicePhoneMobileIcon class="w-5 h-5 flex-shrink-0" />
             SMS Alerts
+          </router-link>
+          <router-link to="/captive-portal" class="sidebar-link" active-class="active">
+            <WifiIcon class="w-5 h-5 flex-shrink-0" />
+            Captive Portal
+          </router-link>
+          <router-link to="/webhooks" class="sidebar-link" active-class="active">
+            <LinkIcon class="w-5 h-5 flex-shrink-0" />
+            Webhooks
           </router-link>
           
           <router-link to="/admin-users" class="sidebar-link" active-class="active">
@@ -207,6 +234,11 @@ import {
   MapPinIcon,
   GlobeAltIcon,
   DevicePhoneMobileIcon,
+  UserGroupIcon,
+  BuildingOffice2Icon,
+  WifiIcon,
+  LinkIcon,
+  TicketIcon as TicketIconOutline,
 } from '@heroicons/vue/24/outline'
 
 const authStore = useAuthStore()

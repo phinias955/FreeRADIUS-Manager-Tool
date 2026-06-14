@@ -146,6 +146,37 @@ const routes = [
         component: () => import('@/views/SMS.vue'),
         meta: { title: 'SMS Notifications', roles: ['admin', 'super_admin'] },
       },
+      // ── Tier 5 Pro ──────────────────────────────────────────────────────
+      {
+        path: 'organizations',
+        name: 'Organizations',
+        component: () => import('@/views/Organizations.vue'),
+        meta: { title: 'Organizations', roles: ['admin', 'super_admin'] },
+      },
+      {
+        path: 'customers',
+        name: 'Customers',
+        component: () => import('@/views/Customers.vue'),
+        meta: { title: 'Customers', roles: ['operator', 'admin', 'super_admin'] },
+      },
+      {
+        path: 'tickets',
+        name: 'Tickets',
+        component: () => import('@/views/Tickets.vue'),
+        meta: { title: 'Support Tickets', roles: ['operator', 'admin', 'super_admin'] },
+      },
+      {
+        path: 'captive-portal',
+        name: 'CaptivePortal',
+        component: () => import('@/views/CaptivePortal.vue'),
+        meta: { title: 'Captive Portals', roles: ['admin', 'super_admin'] },
+      },
+      {
+        path: 'webhooks',
+        name: 'Webhooks',
+        component: () => import('@/views/Webhooks.vue'),
+        meta: { title: 'Webhooks', roles: ['admin', 'super_admin'] },
+      },
       {
         path: 'admin-users',
         name: 'AdminUsers',

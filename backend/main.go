@@ -164,6 +164,9 @@ func main() {
 			portal.GET("/dashboard", h.PortalAuthMiddleware(), h.PortalDashboard)
 		}
 
+		// ── Tier 5 Pro: Captive Portal serve (public HTML, no JWT) ───────────
+		v1.GET("/captive/serve/:id", h.ServeCaptivePortal)
+
 		// Protected routes
 		protected := v1.Group("/")
 		protected.Use(middleware.RequireAuth())
@@ -353,6 +356,56 @@ func main() {
 			smsGroup.GET("/logs", middleware.RequireRole("admin", "super_admin"), h.ListSMSLogs)
 			smsGroup.POST("/notify-expiry", middleware.RequireRole("admin", "super_admin"), h.NotifyUserExpiry)
 			smsGroup.GET("/config", middleware.RequireRole("super_admin"), h.SMSConfig)
+		}
+
+		// ── Tier 5 Pro: Organizations / Resellers ─────────────────────────────
+		orgs := protected.Group("organizations")
+		{
+			orgs.GET("", middleware.RequireRole("admin", "super_admin"), h.ListOrganizations)
+			orgs.POST("", middleware.RequireRole("super_admin"), h.CreateOrganization)
+			orgs.PUT("/:id", middleware.RequireRole("super_admin"), h.UpdateOrganization)
+			orgs.DELETE("/:id", middleware.RequireRole("super_admin"), h.DeleteOrganization)
+			orgs.GET("/:id/stats", middleware.RequireRole("admin", "super_admin"), h.OrgStats)
+		}
+		protected.POST("organizations/assign-user", middleware.RequireRole("admin", "super_admin"), h.AssignUserToOrg)
+
+		// ── Tier 5 Pro: Customers CRM ─────────────────────────────────────────
+		customers := protected.Group("customers")
+		{
+			customers.GET("", middleware.RequireRole("operator", "admin", "super_admin"), h.ListCustomers)
+			customers.GET("/:id", middleware.RequireRole("operator", "admin", "super_admin"), h.GetCustomer)
+			customers.POST("", middleware.RequireRole("admin", "super_admin"), h.CreateCustomer)
+			customers.PUT("/:id", middleware.RequireRole("admin", "super_admin"), h.UpdateCustomer)
+			customers.DELETE("/:id", middleware.RequireRole("admin", "super_admin"), h.DeleteCustomer)
+		}
+
+		// ── Tier 5 Pro: Support Tickets ───────────────────────────────────────
+		tickets := protected.Group("tickets")
+		{
+			tickets.GET("", middleware.RequireRole("operator", "admin", "super_admin"), h.ListTickets)
+			tickets.POST("", middleware.RequireRole("operator", "admin", "super_admin"), h.CreateTicket)
+			tickets.PUT("/:id", middleware.RequireRole("operator", "admin", "super_admin"), h.UpdateTicket)
+			tickets.DELETE("/:id", middleware.RequireRole("admin", "super_admin"), h.DeleteTicket)
+		}
+
+		// ── Tier 5 Pro: Captive Portals (admin) ───────────────────────────────
+		captive := protected.Group("captive")
+		{
+			captive.GET("", middleware.RequireRole("operator", "admin", "super_admin"), h.ListCaptivePortals)
+			captive.POST("", middleware.RequireRole("admin", "super_admin"), h.CreateCaptivePortal)
+			captive.PUT("/:id", middleware.RequireRole("admin", "super_admin"), h.UpdateCaptivePortal)
+			captive.DELETE("/:id", middleware.RequireRole("admin", "super_admin"), h.DeleteCaptivePortal)
+		}
+
+		// ── Tier 5 Pro: Webhooks ─────────────────────────────────────────────
+		hooks := protected.Group("webhooks")
+		{
+			hooks.GET("", middleware.RequireRole("admin", "super_admin"), h.ListWebhooks)
+			hooks.POST("", middleware.RequireRole("super_admin"), h.CreateWebhook)
+			hooks.PUT("/:id", middleware.RequireRole("super_admin"), h.UpdateWebhook)
+			hooks.DELETE("/:id", middleware.RequireRole("super_admin"), h.DeleteWebhook)
+			hooks.POST("/:id/test", middleware.RequireRole("super_admin"), h.TestWebhook)
+			hooks.GET("/:id/logs", middleware.RequireRole("admin", "super_admin"), h.ListWebhookLogs)
 		}
 	}
 

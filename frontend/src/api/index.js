@@ -293,4 +293,49 @@ export const liveStatsAPI = {
   },
 }
 
+// ── Tier 5 Pro: Organizations ─────────────────────────────────────────────
+export const orgsAPI = {
+  list: () => api.get('/organizations'),
+  create: (data) => api.post('/organizations', data),
+  update: (id, data) => api.put(`/organizations/${id}`, data),
+  delete: (id) => api.delete(`/organizations/${id}`),
+  stats: (id) => api.get(`/organizations/${id}/stats`),
+  assignUser: (data) => api.post('/organizations/assign-user', data),
+}
+
+// ── Tier 5 Pro: Customers CRM ─────────────────────────────────────────────
+export const customersAPI = {
+  list: (params) => api.get('/customers', { params }),
+  get: (id) => api.get(`/customers/${id}`),
+  create: (data) => api.post('/customers', data),
+  update: (id, data) => api.put(`/customers/${id}`, data),
+  delete: (id) => api.delete(`/customers/${id}`),
+}
+
+// ── Tier 5 Pro: Support Tickets ───────────────────────────────────────────
+export const ticketsAPI = {
+  list: (params) => api.get('/tickets', { params }),
+  create: (data) => api.post('/tickets', data),
+  update: (id, data) => api.put(`/tickets/${id}`, data),
+  delete: (id) => api.delete(`/tickets/${id}`),
+}
+
+// ── Tier 5 Pro: Captive Portals ───────────────────────────────────────────
+export const captiveAPI = {
+  list: () => api.get('/captive'),
+  create: (data) => api.post('/captive', data),
+  update: (id, data) => api.put(`/captive/${id}`, data),
+  delete: (id) => api.delete(`/captive/${id}`),
+}
+
+// ── Tier 5 Pro: Webhooks ──────────────────────────────────────────────────
+export const webhooksAPI = {
+  list: () => api.get('/webhooks'),
+  create: (data) => api.post('/webhooks', data),
+  update: (id, data) => api.put(`/webhooks/${id}`, data),
+  delete: (id) => api.delete(`/webhooks/${id}`),
+  test: (id) => api.post(`/webhooks/${id}/test`),
+  logs: (id) => api.get(`/webhooks/${id}/logs`),
+}
+
 export default api
