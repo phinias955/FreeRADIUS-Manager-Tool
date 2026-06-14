@@ -202,6 +202,25 @@ const routes = [
         component: () => import('@/views/BulkOps.vue'),
         meta: { title: 'Bulk Operations', roles: ['admin', 'super_admin'] },
       },
+      // ── Tier 7: Security Suite ──────────────────────────────────────────
+      {
+        path: 'security',
+        name: 'SecurityCenter',
+        component: () => import('@/views/SecurityCenter.vue'),
+        meta: { title: 'Security Center', roles: ['operator', 'admin', 'super_admin'] },
+      },
+      {
+        path: 'security/honeypot',
+        name: 'HoneypotLogs',
+        component: () => import('@/views/HoneypotLogs.vue'),
+        meta: { title: 'Honeypot Logs', roles: ['admin', 'super_admin'] },
+      },
+      {
+        path: 'security/simulator',
+        name: 'RadiusSimulator',
+        component: () => import('@/views/RadiusSimulator.vue'),
+        meta: { title: 'RADIUS Simulator', roles: ['admin', 'super_admin'] },
+      },
       {
         path: 'admin-users',
         name: 'AdminUsers',

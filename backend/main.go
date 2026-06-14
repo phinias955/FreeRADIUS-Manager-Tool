@@ -105,10 +105,12 @@ func main() {
 	// Initialize handlers
 	h := handlers.New(db, log)
 
-	// ── Start Tier 2 background workers ─────────────────────────────────────
+	// ── Start Tier 2-7 background workers ───────────────────────────────────
 	handlers.StartNASMonitor(db, log)
 	handlers.StartAlertWorker(db, log)
 	handlers.StartScheduler(db, log)
+	handlers.StartHoneypot(db, log)
+	handlers.StartCredStuffingDetector(db, log)
 
 	// API v1 routes
 	v1 := router.Group("/api/v1")
@@ -445,6 +447,44 @@ func main() {
 		{
 			bulk.POST("", middleware.RequireRole("admin", "super_admin"), h.BulkOperation)
 			bulk.GET("/history", middleware.RequireRole("admin", "super_admin"), h.ListBulkOpHistory)
+		}
+
+		// ── Tier 7: Security Suite ────────────────────────────────────────────
+		// RADIUS Simulator
+		sim := protected.Group("radius/simulate")
+		{
+			sim.POST("", middleware.RequireRole("admin", "super_admin"), h.SimulateAuth)
+			sim.POST("/batch", middleware.RequireRole("admin", "super_admin"), h.SimulateBatch)
+		}
+
+		// GeoIP Enforcement
+		geoip := protected.Group("security/geoip")
+		{
+			geoip.GET("/lookup", middleware.RequireRole("operator", "admin", "super_admin"), h.GeoIPLookup)
+			geoip.GET("/rules", middleware.RequireRole("operator", "admin", "super_admin"), h.ListGeoIPRules)
+			geoip.POST("/rules", middleware.RequireRole("admin", "super_admin"), h.CreateGeoIPRule)
+			geoip.DELETE("/rules/:id", middleware.RequireRole("admin", "super_admin"), h.DeleteGeoIPRule)
+		}
+
+		// Honeypot
+		hp := protected.Group("security/honeypot")
+		{
+			hp.GET("/status", middleware.RequireRole("operator", "admin", "super_admin"), h.HoneypotStatus)
+			hp.GET("/logs", middleware.RequireRole("admin", "super_admin"), h.ListHoneypotLogs)
+			hp.DELETE("/logs", middleware.RequireRole("admin", "super_admin"), h.ClearHoneypotLogs)
+		}
+
+		// Credential Stuffing + IP blocking
+		sec := protected.Group("security")
+		{
+			sec.GET("/summary", middleware.RequireRole("operator", "admin", "super_admin"), h.SecuritySummary)
+			sec.GET("/alerts", middleware.RequireRole("operator", "admin", "super_admin"), h.ListSecurityAlerts)
+			sec.PUT("/alerts/:id/ack", middleware.RequireRole("operator", "admin", "super_admin"), h.AcknowledgeAlert)
+			sec.PUT("/alerts/ack-all", middleware.RequireRole("admin", "super_admin"), h.AcknowledgeAllAlerts)
+			sec.DELETE("/alerts/:id", middleware.RequireRole("admin", "super_admin"), h.DeleteAlert)
+			sec.GET("/blocked-ips", middleware.RequireRole("admin", "super_admin"), h.GetBlockedIPs)
+			sec.POST("/blocked-ips", middleware.RequireRole("admin", "super_admin"), h.BlockIP)
+			sec.DELETE("/blocked-ips/:id", middleware.RequireRole("admin", "super_admin"), h.UnblockIP)
 		}
 	}
 

@@ -150,6 +150,21 @@
             <BoltIcon class="w-5 h-5 flex-shrink-0" />
             Bulk Operations
           </router-link>
+
+          <!-- ── Tier 7: Security Suite ─────────────────────────────── -->
+          <div class="sidebar-section-label">Security</div>
+          <router-link to="/security" class="sidebar-link" active-class="active">
+            <ShieldExclamationIcon class="w-5 h-5 flex-shrink-0" />
+            Security Center
+          </router-link>
+          <router-link to="/security/honeypot" class="sidebar-link" active-class="active">
+            <BugAntIcon class="w-5 h-5 flex-shrink-0" />
+            Honeypot Logs
+          </router-link>
+          <router-link to="/security/simulator" class="sidebar-link" active-class="active">
+            <BeakerIcon class="w-5 h-5 flex-shrink-0" />
+            RADIUS Simulator
+          </router-link>
           
           <router-link to="/admin-users" class="sidebar-link" active-class="active">
             <ShieldCheckIcon class="w-5 h-5 flex-shrink-0" />
@@ -259,6 +274,9 @@ import {
   TagIcon,
   CodeBracketSquareIcon,
   BoltIcon,
+  ShieldExclamationIcon,
+  BugAntIcon,
+  BeakerIcon,
 } from '@heroicons/vue/24/outline'
 
 const authStore = useAuthStore()
