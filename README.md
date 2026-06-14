@@ -1,281 +1,333 @@
-# RADIUS Manager
+# FreeRADIUS Manager Tool
 
-A complete, production-ready network authentication platform built on **FreeRADIUS 3.2**, **PostgreSQL**, **Go**, and **Vue.js 3**. Manage RADIUS users, NAS devices, monitor sessions, and run a first-time setup wizard — all from a clean web interface.
+<div align="center">
+
+![Version](https://img.shields.io/badge/version-2.0.0--pro-blue)
+![Go](https://img.shields.io/badge/Go-1.21-00ADD8?logo=go)
+![Vue](https://img.shields.io/badge/Vue.js-3-4FC08D?logo=vue.js)
+![FreeRADIUS](https://img.shields.io/badge/FreeRADIUS-3.2-red)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-336791?logo=postgresql)
+![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker)
+![License](https://img.shields.io/badge/license-MIT-green)
+
+**A complete open-source FreeRADIUS management platform.**  
+Multi-tenant · Billing · CRM · Security Suite · Captive Portal · Webhooks · and much more.
+
+[Live Demo](#) · [Report Bug](https://github.com/phinias955/FreeRADIUS-Manager-Tool/issues) · [Request Feature](https://github.com/phinias955/FreeRADIUS-Manager-Tool/issues)
+
+</div>
 
 ---
 
 ## Table of Contents
 
-1. [Features](#features)
-2. [Architecture](#architecture)
-3. [Requirements](#requirements)
-4. [Installation & First-Time Setup](#installation--first-time-setup)
-5. [Environment Variables](#environment-variables)
-6. [User Roles & Permissions](#user-roles--permissions)
-7. [Configuring Network Devices](#configuring-network-devices)
-8. [API Reference](#api-reference)
-9. [Operations & Maintenance](#operations--maintenance)
-10. [Security Hardening](#security-hardening)
-11. [Troubleshooting](#troubleshooting)
-12. [FAQ](#faq)
+1. [Overview](#overview)
+2. [Feature Matrix](#feature-matrix)
+3. [Architecture](#architecture)
+4. [Requirements](#requirements)
+5. [Quick Start](#quick-start)
+6. [First-Time Setup Wizard](#first-time-setup-wizard)
+7. [Environment Variables](#environment-variables)
+8. [User Roles & Permissions](#user-roles--permissions)
+9. [Module Documentation](#module-documentation)
+   - [RADIUS Users](#radius-users)
+   - [NAS Devices](#nas-devices)
+   - [User Plans & Billing](#user-plans--billing)
+   - [Vouchers](#vouchers)
+   - [Bandwidth Profiles](#bandwidth-profiles)
+   - [IP Pools](#ip-pools)
+   - [Hotspot Zones](#hotspot-zones)
+   - [Captive Portal Builder](#captive-portal-builder)
+   - [User Self-Service Portal](#user-self-service-portal)
+   - [Organizations (Multi-Tenancy)](#organizations-multi-tenancy)
+   - [CRM — Customers & Tickets](#crm--customers--tickets)
+   - [Payments](#payments)
+   - [Promotions & Discount Codes](#promotions--discount-codes)
+   - [RADIUS Templates](#radius-templates)
+   - [Bulk Operations](#bulk-operations)
+   - [SMS Notifications](#sms-notifications)
+   - [Email Alerts](#email-alerts)
+   - [Webhooks](#webhooks)
+   - [Scheduler](#scheduler)
+   - [API Keys](#api-keys)
+   - [Reports & Analytics](#reports--analytics)
+   - [Live Stats (SSE)](#live-stats-sse)
+   - [Network Map](#network-map)
+   - [Security Suite (Tier 7)](#security-suite-tier-7)
+10. [API Reference](#api-reference)
+11. [Connecting Network Devices](#connecting-network-devices)
+12. [Operations & Maintenance](#operations--maintenance)
+13. [Upgrading](#upgrading)
+14. [Troubleshooting](#troubleshooting)
+15. [FAQ](#faq)
+16. [Contributing](#contributing)
+17. [License](#license)
 
 ---
 
-## Features
+## Overview
 
-| Category | What it does |
+**FreeRADIUS Manager Tool** is a production-ready, all-in-one web platform that sits on top of FreeRADIUS and PostgreSQL. It replaces the need for manual `radtest`, editing `radcheck`/`radreply` tables by hand, and complex shell scripts — with a clean, role-based web interface built for ISPs, enterprises, hotspot operators, and network engineers.
+
+### What it solves
+
+| Problem | Solution |
 |---|---|
-| **First-Run Wizard** | 6-step GUI collects org name, admin account, RADIUS secret, security policies — setup page locks forever after first use |
-| **RADIUS Authentication** | FreeRADIUS 3.2.10 backed by PostgreSQL, supports PAP, CHAP, MS-CHAP, EAP/PEAP |
-| **User Management** | Create, edit, suspend, activate, delete RADIUS users; per-user device limit (1–500) |
-| **Bulk Operations** | CSV import/export of RADIUS users with password generation |
-| **NAS Devices** | Add/edit/delete NAS clients; test connectivity from the UI; auto-discover local devices |
-| **Session Monitoring** | View active sessions, per-user session history, forced disconnect |
-| **Auth & Audit Logs** | Every login attempt, every admin action is logged with IP and timestamp |
-| **RBAC** | Three roles: Super Admin, Admin, Operator — all enforced server-side |
-| **JWT Security** | 15-minute access tokens + 7-day refresh tokens with rotation |
-| **MFA** | TOTP-based two-factor authentication (Google Authenticator compatible) |
-| **Rate Limiting** | Per-IP brute-force protection with configurable lockout |
-| **Backup / Restore** | One-click database backup and restore from the UI |
-| **Docker** | Single `docker-compose up -d` starts everything |
+| Managing hundreds of RADIUS users manually | Web UI with bulk operations, CSV import/export, templates |
+| No visibility into who is online | Live dashboard with session monitoring and kick |
+| Complex billing for ISP plans | User Plans, Invoices, Payments with receipt generation |
+| Security blind spots | Honeypot listener, credential stuffing detection, GeoIP enforcement |
+| Multi-site management | Hotspot Zones, NAS grouping, Network Map |
+| No customer portal | Self-service portal for end-users |
+| Integrations with external systems | Webhooks with HMAC signing, REST API with API keys |
+
+---
+
+## Feature Matrix
+
+### Core Platform
+| Feature | Description |
+|---|---|
+| First-Run Setup Wizard | 6-step GUI; page locks permanently after first use |
+| RADIUS Authentication | PAP, CHAP, MS-CHAP, EAP/PEAP via FreeRADIUS 3.2 |
+| User Management | Create, edit, suspend, activate, delete RADIUS users |
+| NAS Device Management | Add, test, monitor NAS devices with live ping status |
+| Session Monitoring | View active sessions, kick users, view history |
+| Role-Based Access Control | Super Admin, Admin, Operator — scoped permissions |
+| MFA / 2FA | TOTP-based second factor for admin accounts |
+| JWT Authentication | Short-lived access tokens + refresh token rotation |
+| Dark Mode | Full dark/light theme toggle |
+
+### Tier 1 — Monetisation Basics
+| Feature | Description |
+|---|---|
+| Vouchers | Generate, disable, export voucher codes for prepaid access |
+| Bandwidth Profiles | Named profiles (e.g. "10Mbps/5Mbps") applied via Mikrotik-Rate-Limit |
+| Reports & Analytics | Usage reports, daily trends, NAS usage, auth success rates |
+
+### Tier 2 — Business Layer
+| Feature | Description |
+|---|---|
+| User Plans | Define plans with speed, quota, expiry; assign to users |
+| Billing / Invoices | Auto-generate invoices, track payment status |
+| NAS Monitor | Background ping worker; live latency badge on NAS list |
+| Email Alerts | Configurable alert rules sent via SMTP |
+
+### Tier 3 — Advanced System
+| Feature | Description |
+|---|---|
+| IP Pools | CIDR-based pools, auto-assign/release static IPs to users |
+| API Keys | Generate bearer keys for external system integration |
+| Scheduler | Built-in task runner (expire users, cleanup, custom scripts) |
+| CSV Import | Advanced multi-column bulk user import with validation |
+
+### Tier 4 — Network Management
+| Feature | Description |
+|---|---|
+| Hotspot Zones | Group NAS devices into logical zones with stats |
+| Network Map | Visual NAS topology with live online/offline status |
+| User Self-Service Portal | End-users log in with RADIUS credentials to view usage |
+| Live Stats (SSE) | Real-time dashboard counters via Server-Sent Events |
+| SMS Notifications | Send individual or bulk SMS via configurable gateway |
+
+### Tier 5 — Enterprise
+| Feature | Description |
+|---|---|
+| Organizations / Resellers | Multi-tenant support; isolate users, NAS, invoices per org |
+| CRM — Customers | Full customer profiles with contracts and notes |
+| Support Tickets | Built-in helpdesk ticketing linked to customers |
+| Captive Portal Builder | Brand and deploy custom login pages per zone |
+| Webhooks | Event-driven HTTP callbacks with HMAC-SHA256 signing |
+
+### Tier 6 — Financial & Operations
+| Feature | Description |
+|---|---|
+| Payments | Record payments, link to invoices, generate HTML receipts |
+| Promotions / Discounts | Discount codes with usage limits, date ranges, percentage/fixed |
+| RADIUS Templates | Reusable attribute sets applied to any number of users |
+| Bulk Operations | Suspend, activate, delete, change plan, set expiry — mass actions |
+
+### Tier 7 — Security Suite
+| Feature | Description |
+|---|---|
+| RADIUS Simulator | Send real UDP Access-Request packets, inspect full attribute exchange |
+| GeoIP Enforcement | Block/flag/allow countries; live IP lookup with VPN detection |
+| Honeypot Listener | Decoy RADIUS on UDP 11812; logs all probes, raises alerts |
+| Credential Stuffing Detection | Sliding-window per-IP rate limiter; auto-blocks repeat offenders |
+| Pattern Analysis | Background goroutine scans `radpostauth` every 5 min for attacks |
+| Security Alerts | Severity-graded feed (low/medium/high/critical) with acknowledge |
+| IP Block Manager | Manual + automatic block list with expiry and reason |
 
 ---
 
 ## Architecture
 
 ```
-┌────────────────────────────────────────────────────────────┐
-│                    Docker Network (bridge)                  │
-│                                                            │
-│   Browser                                                  │
-│      │  :8081                                             │
-│      ▼                                                     │
-│  ┌───────────┐   /api/v1/*   ┌──────────────────────────┐ │
-│  │ Frontend  │ ────────────▶ │  Backend  (Go + Gin)      │ │
-│  │ Vue.js 3  │               │  REST API  :8088          │ │
-│  │ Nginx :80 │               └──────────┬───────────────┘ │
-│  └───────────┘                          │                  │
-│                                         │                  │
-│                              ┌──────────┴──────────┐      │
-│                              │   PostgreSQL :5432   │      │
-│                              └──────────┬──────────┘      │
-│                                         │                  │
-│                              ┌──────────┴──────────┐      │
-│  NAS Devices ──────────────▶ │  FreeRADIUS 3.2.10  │      │
-│  (Routers, APs, Switches)    │  Auth  :1812/UDP    │      │
-│                              │  Acct  :1813/UDP    │      │
-│                              └─────────────────────┘      │
-└────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────┐
+│                     Browser / Client                     │
+└─────────────────────┬───────────────────────────────────┘
+                      │ HTTPS (port 8081)
+┌─────────────────────▼───────────────────────────────────┐
+│              Vue.js 3 Frontend (Nginx)                   │
+│  Composition API · Pinia · Vue Router · Tailwind CSS    │
+└─────────────────────┬───────────────────────────────────┘
+                      │ REST API + SSE (port 8088)
+┌─────────────────────▼───────────────────────────────────┐
+│              Go Backend (Gin Framework)                  │
+│  JWT Auth · RBAC · Background Workers · Webhooks        │
+└──────┬──────────────────────────────┬───────────────────┘
+       │ SQL                          │ UDP 1812/1813
+┌──────▼──────────┐         ┌─────────▼───────────────────┐
+│   PostgreSQL 15 │         │     FreeRADIUS 3.2           │
+│  radcheck       │◄────────│  rlm_sql_postgresql          │
+│  radreply       │         │  PAP · CHAP · MS-CHAP · EAP  │
+│  radacct        │         └─────────────────────────────┘
+│  radpostauth    │
+│  app tables     │         ┌─────────────────────────────┐
+└─────────────────┘         │  Honeypot (UDP 11812)        │
+                            │  Go goroutine (built-in)     │
+                            └─────────────────────────────┘
 ```
 
-### Services
-
-| Container | Image | Purpose |
-|---|---|---|
-| `radius_postgres` | postgres:15-alpine | Database for app users, RADIUS users, sessions, NAS clients |
-| `radius_freeradius` | freeradius/freeradius-server:3.2.10 | RADIUS auth & accounting server |
-| `radius_backend` | Go 1.21 (built locally) | REST API, business logic, JWT auth |
-| `radius_frontend` | Node 20 + Nginx (built locally) | Web UI served by Nginx, proxies `/api/` to backend |
+All four services run as Docker containers and communicate over an internal bridge network.
 
 ---
 
 ## Requirements
 
-| Requirement | Minimum |
-|---|---|
-| OS | Linux (Ubuntu 20.04+, Debian 11+, Rocky 8+) |
-| Docker | 20.10+ |
-| Docker Compose | v2.0+ (plugin) or v1.29+ (standalone) |
-| RAM | 1 GB free |
-| Disk | 2 GB free |
-| Open ports | `8081/TCP` (web UI), `1812/UDP` (RADIUS auth), `1813/UDP` (RADIUS accounting) |
-
-> **Windows / macOS:** Use Docker Desktop. The stack works identically.
-
----
-
-## Installation & First-Time Setup
-
-### Step 1 — Clone the project
-
-```bash
-git clone https://github.com/your-org/radius-manager.git
-cd radius-manager
-```
-
-Or upload the project folder to your server and `cd` into it.
+| Requirement | Minimum | Recommended |
+|---|---|---|
+| OS | Ubuntu 20.04 / Debian 11 | Ubuntu 22.04 LTS |
+| RAM | 1 GB | 4 GB |
+| CPU | 1 core | 2+ cores |
+| Disk | 10 GB | 50 GB |
+| Docker | 20.10+ | latest |
+| Docker Compose | 1.29+ | v2 |
+| Open ports | 1812/udp, 1813/udp, 8081/tcp | + 11812/udp (honeypot) |
 
 ---
 
-### Step 2 — Create your `.env` file
+## Quick Start
 
 ```bash
+# 1. Clone the repository
+git clone https://github.com/phinias955/FreeRADIUS-Manager-Tool.git
+cd FreeRADIUS-Manager-Tool
+
+# 2. Copy and edit environment file
 cp .env.example .env
+nano .env        # Set DB_PASSWORD, JWT_SECRET, RADIUS_SECRET at minimum
+
+# 3. Start all services
+docker-compose up -d
+
+# 4. Check all containers are running
+docker-compose ps
 ```
 
-Open `.env` and set **at minimum** these three values:
+Then open **http://your-server-ip:8081** — the setup wizard will appear automatically.
 
-```bash
-# Strong random string — used to sign JWT tokens
-JWT_SECRET=replace-with-64-or-more-random-characters
-
-# Database password
-DB_PASSWORD=a-strong-database-password
-
-# RADIUS shared secret — must match what you configure on every NAS device
-RADIUS_SECRET=your-radius-shared-secret-min-16-chars
-```
-
-> Generate strong secrets quickly:
-> ```bash
-> openssl rand -hex 32   # for JWT_SECRET
-> openssl rand -hex 16   # for RADIUS_SECRET
-> ```
+> **Tip:** To follow logs: `docker-compose logs -f backend`
 
 ---
 
-### Step 3 — Build and start all containers
+## First-Time Setup Wizard
 
-```bash
-docker-compose up -d --build
-```
+The setup wizard runs **once only**. After completion it is permanently locked (returns 404) to prevent re-configuration by attackers.
 
-This will:
-- Pull the FreeRADIUS and PostgreSQL base images
-- Build the Go backend and Vue.js frontend
-- Start all four services in the correct order
-- Run the database schema initialisation automatically
-
-First build takes **2–4 minutes**. Subsequent starts take under 10 seconds.
-
----
-
-### Step 4 — Complete the Setup Wizard
-
-Open your browser and go to:
-
-```
-http://YOUR_SERVER_IP:8081
-```
-
-You will be automatically redirected to the **Setup Wizard**. Fill in each step:
+### Step-by-step
 
 | Step | What you configure |
 |---|---|
-| 1 — Welcome | Overview of what gets configured |
-| 2 — Organisation | Organisation name and timezone |
-| 3 — Admin Account | Super-admin username, email, full name, password |
-| 4 — RADIUS Settings | RADIUS shared secret (must match your `.env` `RADIUS_SECRET`) |
-| 5 — Security Policies | Password policy, session timeout, brute-force lockout |
-| 6 — Review & Finish | Confirm all settings and submit |
+| 1. Welcome | Review requirements |
+| 2. Database | Verify PostgreSQL connectivity |
+| 3. Organization | Company name, contact email, timezone |
+| 4. Admin Account | Username, full name, strong password |
+| 5. RADIUS Settings | Shared secret (must match NAS devices), server host |
+| 6. Security | Session timeout, brute-force lockout, IP whitelist |
 
-After clicking **Complete Setup**:
-- The system creates your admin account
-- The setup page is **permanently locked** (returns 404 for all future requests)
-- You are automatically redirected to the login page
+After completing all steps, the wizard redirects to the login page and the `/api/v1/setup/*` routes become permanently inaccessible.
 
-> **Important:** The setup page can only be completed **once**. If you need to reset and start over, follow the [Factory Reset](#factory-reset) procedure below.
-
----
-
-### Step 5 — Log in
-
-Use the admin credentials you set in the wizard.
-
-| Field | Value |
-|---|---|
-| URL | `http://YOUR_SERVER_IP:8081` |
-| Username | The username you chose in the wizard |
-| Password | The password you chose in the wizard |
-
----
-
-### Verify everything is healthy
-
-```bash
-# All containers should show "Up"
-docker-compose ps
-
-# Check FreeRADIUS is accepting RADIUS requests
-SECRET=$(docker exec radius_freeradius sh -c 'echo $RADIUS_SECRET')
-docker exec radius_freeradius radtest YOUR_USERNAME YOUR_PASSWORD 127.0.0.1 1812 "$SECRET"
-# Expected: "Received Access-Accept"
-
-# Check the backend API
-curl http://localhost:8088/api/v1/health
-# Expected: {"status":"ok","services":{"database":"ok"}}
-```
+### Security notes
+- Setup endpoint is rate-limited to 10 requests per IP
+- The setup completion state is cached in memory — a restart does not re-open it
+- All setup input is validated server-side before writing to the database
 
 ---
 
 ## Environment Variables
 
-Full list of all supported variables in `.env`:
+Copy `.env.example` to `.env` and set every value before first run.
+
+### Required
+
+| Variable | Example | Description |
+|---|---|---|
+| `DB_PASSWORD` | `Str0ngP@ss!` | PostgreSQL password |
+| `JWT_SECRET` | `64-char-random-string` | Signs all JWT tokens — keep secret |
+| `RADIUS_SECRET` | `32-char-minimum` | Shared secret between server and NAS devices |
 
 ### Database
 
 | Variable | Default | Description |
 |---|---|---|
-| `DB_HOST` | `postgres` | PostgreSQL hostname (Docker service name) |
+| `DB_HOST` | `postgres` | PostgreSQL host (Docker service name) |
 | `DB_PORT` | `5432` | PostgreSQL port |
 | `DB_USER` | `radius_user` | Database username |
-| `DB_PASSWORD` | — | **Required.** Database password |
 | `DB_NAME` | `radius` | Database name |
-| `DB_SSL_MODE` | `disable` | Set to `require` in production behind TLS |
+| `DB_SSL_MODE` | `disable` | `disable` / `require` / `verify-full` |
+| `DB_MAX_OPEN_CONNS` | `25` | Connection pool max open |
+| `DB_MAX_IDLE_CONNS` | `5` | Connection pool max idle |
 
-### JWT Authentication
+### Application
 
 | Variable | Default | Description |
 |---|---|---|
-| `JWT_SECRET` | — | **Required.** Secret for signing tokens. Use 64+ random chars |
+| `WEB_PORT` | `8081` | Frontend port exposed to the internet |
+| `APP_ENV` | `production` | `production` disables Gin debug output |
+| `VITE_API_URL` | `http://localhost:8088` | URL the browser uses to reach the API |
+
+### JWT
+
+| Variable | Default | Description |
+|---|---|---|
 | `JWT_ACCESS_EXPIRY` | `15m` | Access token lifetime |
 | `JWT_REFRESH_EXPIRY` | `168h` | Refresh token lifetime (7 days) |
 
-### RADIUS
+### Email (SMTP)
+
+| Variable | Example | Description |
+|---|---|---|
+| `SMTP_HOST` | `smtp.gmail.com` | SMTP server hostname |
+| `SMTP_PORT` | `587` | SMTP port (587 = STARTTLS) |
+| `SMTP_USER` | `admin@example.com` | SMTP login username |
+| `SMTP_PASS` | `app-password` | SMTP password / app password |
+| `SMTP_FROM` | `noreply@example.com` | From address for system emails |
+
+### SMS Gateway
+
+| Variable | Example | Description |
+|---|---|---|
+| `SMS_GATEWAY` | `https://api.smsprovider.com/send` | HTTP SMS endpoint |
+| `SMS_API_KEY` | `your-api-key` | API key for SMS gateway |
+| `SMS_SENDER_ID` | `NetManager` | Sender name/number |
+| `SMS_BODY_TEMPLATE` | `Hi {name}, your account expires {date}` | Message template |
+
+### Security (Tier 7)
 
 | Variable | Default | Description |
 |---|---|---|
-| `RADIUS_HOST` | `freeradius` | FreeRADIUS hostname (Docker service name) |
-| `RADIUS_AUTH_PORT` | `1812` | Authentication port |
-| `RADIUS_ACCT_PORT` | `1813` | Accounting port |
-| `RADIUS_SECRET` | — | **Required.** Shared secret. Must match every NAS device config |
-| `RADIUS_TIMEOUT` | `5s` | Timeout for backend→FreeRADIUS packets |
-| `RADIUS_RETRIES` | `3` | Retry count for test packets |
+| `HONEYPOT_PORT` | `11812` | UDP port for the honeypot RADIUS listener |
 
-### Web Interface
+### Credential Stuffing Thresholds (set in Admin → Settings)
 
-| Variable | Default | Description |
+| Setting Key | Default | Description |
 |---|---|---|
-| `WEB_PORT` | `8088` | Backend API internal port |
-| `VITE_API_URL` | `http://localhost:8088` | API base URL used by the frontend during build |
-
-### Security
-
-| Variable | Default | Description |
-|---|---|---|
-| `ADMIN_IP_WHITELIST` | `0.0.0.0/0` | CIDR to restrict admin access. Example: `10.0.0.0/8` |
-| `SESSION_TIMEOUT` | `3600` | Idle session timeout in seconds |
-| `BCRYPT_COST` | `12` | bcrypt cost factor for password hashing (10–14 recommended) |
-| `RATE_LIMIT` | `100` | Max requests per minute per IP |
-| `BRUTE_FORCE_ATTEMPTS` | `5` | Failed logins before lockout |
-| `BRUTE_FORCE_LOCKOUT` | `15` | Lockout duration in minutes |
-
-### Email (Optional)
-
-| Variable | Default | Description |
-|---|---|---|
-| `SMTP_HOST` | — | SMTP server hostname |
-| `SMTP_PORT` | `587` | SMTP port |
-| `SMTP_USER` | — | SMTP username |
-| `SMTP_PASS` | — | SMTP password |
-| `SMTP_FROM` | `noreply@radius-manager.local` | From address |
-
-### Backup
-
-| Variable | Default | Description |
-|---|---|---|
-| `BACKUP_SCHEDULE` | `0 2 * * *` | Cron schedule for automatic backups (2 AM daily) |
-| `BACKUP_RETENTION_DAYS` | `30` | Days to keep automatic backups |
+| `cs_max_fails` | `10` | Failed auth attempts before blocking |
+| `cs_window_secs` | `300` | Sliding window in seconds |
+| `cs_block_mins` | `60` | Block duration in minutes |
+| `honeypot_enabled` | `true` | Enable/disable honeypot listener |
+| `geoip_mode` | `flag` | `flag` / `block` / `disabled` |
 
 ---
 
@@ -283,483 +335,705 @@ Full list of all supported variables in `.env`:
 
 | Permission | Super Admin | Admin | Operator |
 |---|:---:|:---:|:---:|
-| View RADIUS users | ✅ | ✅ | ✅ |
-| Create RADIUS users | ✅ | ✅ | ❌ |
-| Edit RADIUS users | ✅ | ✅ | ❌ |
-| Delete RADIUS users | ✅ | ✅ | ❌ |
-| Reset user password | ✅ | ✅ | ✅ |
-| Suspend / activate user | ✅ | ✅ | ❌ |
-| Force disconnect user | ✅ | ✅ | ❌ |
-| Bulk import / export CSV | ✅ | ✅ | ❌ |
-| View NAS devices | ✅ | ✅ | ✅ |
-| Add / edit / delete NAS | ✅ | ✅ | ❌ |
-| Test NAS connectivity | ✅ | ✅ | ❌ |
-| View active sessions | ✅ | ✅ | ✅ |
-| View auth logs | ✅ | ✅ | ✅ |
-| View audit logs | ✅ | ✅ | ❌ |
+| Setup wizard | ✅ | ❌ | ❌ |
 | Manage admin users | ✅ | ❌ | ❌ |
 | System settings | ✅ | ❌ | ❌ |
-| Backup / restore | ✅ | ❌ | ❌ |
+| Organizations | ✅ | ✅ | ❌ |
+| RADIUS users (create/edit/delete) | ✅ | ✅ | ❌ |
+| RADIUS users (view/search) | ✅ | ✅ | ✅ |
+| NAS devices | ✅ | ✅ | view |
+| Plans & Billing | ✅ | ✅ | view |
+| Payments | ✅ | ✅ | create |
+| Bulk Operations | ✅ | ✅ | ❌ |
+| Vouchers | ✅ | ✅ | view |
+| Reports | ✅ | ✅ | ✅ |
+| Security Center (view) | ✅ | ✅ | ✅ |
+| Security Center (block IP, rules) | ✅ | ✅ | ❌ |
+| RADIUS Simulator | ✅ | ✅ | ❌ |
+| API Keys | ✅ | ✅ | ❌ |
+| Webhooks | ✅ | ✅ | ❌ |
 
 ---
 
-## Configuring Network Devices
+## Module Documentation
 
-All NAS devices must use the **same `RADIUS_SECRET`** you set in `.env` and the wizard.
+### RADIUS Users
 
-### MikroTik RouterOS (Hotspot / PPPoE)
+**Path:** `/users`
 
-```routeros
-/radius
-add address=YOUR_SERVER_IP secret=YOUR_RADIUS_SECRET service=hotspot,ppp
+Create and manage FreeRADIUS authentication accounts. Each user maps directly to rows in the `radcheck` and `radreply` tables.
 
-/ip hotspot profile
-set [find default=yes] use-radius=yes
+**Key attributes set automatically:**
+- `Cleartext-Password` — stores the login password
+- `Simultaneous-Use` — maximum concurrent sessions (1–500)
+- `Expiration` — account expiry date (`Jan 01 2026 00:00:00`)
+- `Mikrotik-Rate-Limit` — upload/download speed limit from bandwidth profile
+- `Framed-IP-Address` — static IP from an IP pool (optional)
 
-/ppp profile
-set [find default=yes] use-radius=yes
+**CSV Import format:**
+```
+username,password,expiry,max_sessions,bandwidth_profile
+alice,Pass1234,2027-01-01,2,10mbps
+bob,Secure99!,2026-06-30,1,
 ```
 
-### MikroTik — Add Accounting
+---
 
-```routeros
-/radius
-set [find address=YOUR_SERVER_IP] accounting-port=1813
+### NAS Devices
 
-/ip hotspot profile
-set [find] accounting=yes
+**Path:** `/nas`
+
+Register all network devices (routers, access points, switches) that send RADIUS requests.
+
+| Field | Description |
+|---|---|
+| NAS Name | IP address or hostname |
+| Short Name | Display label |
+| Type | `cisco`, `mikrotik`, `other`, etc. |
+| Ports | Number of ports (informational) |
+| Shared Secret | Must match the device configuration **exactly** |
+| Zone | Assign to a Hotspot Zone |
+
+**RADIUS Test** — sends a live `Access-Request` UDP packet to verify connectivity. Shows latency in milliseconds.
+
+**Disconnect (CoA)** — sends a `Disconnect-Request` to terminate a specific user session remotely (requires NAS CoA support).
+
+---
+
+### User Plans & Billing
+
+**Path:** `/plans` · `/billing`
+
+Define internet service plans and assign them to users.
+
+**Plan fields:**
+- Name, description, price
+- Speed (upload/download Mbps)
+- Data quota (GB, 0 = unlimited)
+- Duration (days)
+- Validity period
+
+**Invoice lifecycle:** `pending` → `paid` → `overdue`
+
+Invoices are generated automatically when a plan is assigned. The billing page shows all invoices with filter by status, user, and date range.
+
+---
+
+### Vouchers
+
+**Path:** `/vouchers`
+
+Generate pre-paid access codes for time-limited or data-limited access.
+
+- Generate batches of 1–1000 vouchers
+- Each voucher has a unique code, expiry, and usage limit
+- Export to CSV for printing
+- Disable individual vouchers
+
+---
+
+### Bandwidth Profiles
+
+**Path:** `/bandwidth`
+
+Named speed profiles applied to users via the `Mikrotik-Rate-Limit` RADIUS attribute.
+
+**Format example:** `10M/5M` (10 Mbps down / 5 Mbps up)
+
+Profiles can be applied to individual users or via bulk operations.
+
+---
+
+### IP Pools
+
+**Path:** `/ip-pools`
+
+Define CIDR ranges and auto-assign static IP addresses to RADIUS users.
+
+```
+Pool: "ISP-Main"  CIDR: 192.168.100.0/24
+→ 254 available IPs auto-managed
+→ Assigned IPs written to radreply as Framed-IP-Address
 ```
 
-### Cisco IOS / IOS-XE
+**Operations:** assign, release, view all assignments.
 
+---
+
+### Hotspot Zones
+
+**Path:** `/zones`
+
+Group NAS devices into logical sites (e.g. "Downtown", "Airport", "School").
+
+Each zone shows:
+- Number of NAS devices
+- Currently active users
+- Zone-level statistics
+
+---
+
+### Captive Portal Builder
+
+**Path:** `/captive-portal`
+
+Design and deploy custom branded login pages for hotspot zones without writing HTML.
+
+**Configurable fields:**
+- Logo URL
+- Background color / image
+- Title, welcome message, footer text
+- Primary button color
+
+The portal is served at a public URL: `/api/v1/captive/serve/:id`
+
+---
+
+### User Self-Service Portal
+
+**Path:** `/portal` (public, no admin login required)
+
+End-users authenticate with their **RADIUS credentials** and see:
+- Account status and expiry
+- Current data usage (upload/download)
+- Active sessions
+- Session history
+- Assigned IP address
+
+> Accessible at `http://your-server:8081/portal`
+
+---
+
+### Organizations (Multi-Tenancy)
+
+**Path:** `/organizations`
+
+Create tenant accounts for resellers or branch offices. Each organization has its own:
+- RADIUS users
+- NAS devices
+- Invoices and revenue tracking
+- Admin users (scoped to that org)
+
+---
+
+### CRM — Customers & Tickets
+
+**Path:** `/customers` · `/tickets`
+
+**Customers** — full profiles separate from RADIUS users:
+- Contact info, contract type, contract value
+- Notes and history
+- Link to RADIUS username
+
+**Tickets** — internal helpdesk:
+- Open, in-progress, closed, resolved statuses
+- Priority levels (low, medium, high, urgent)
+- Full description and resolution notes
+- Linked to customer and assigned admin
+
+---
+
+### Payments
+
+**Path:** `/payments`
+
+Record financial transactions against invoices.
+
+- Payment methods: cash, bank transfer, mobile money, card, other
+- Automatic invoice status update to `paid` on payment record
+- HTML receipt generation (printable)
+- Revenue summary dashboard (today, this month, total)
+- Webhook event `invoice.paid` fired on every payment
+
+---
+
+### Promotions & Discount Codes
+
+**Path:** `/promotions`
+
+Create discount codes for plan promotions.
+
+| Field | Description |
+|---|---|
+| Code | Unique promo code (e.g. `SAVE20`) |
+| Type | `percentage` or `fixed` |
+| Value | Discount amount |
+| Max Uses | Total uses allowed (0 = unlimited) |
+| Valid From / Until | Date range |
+| Active | Toggle on/off |
+
+**Validate endpoint:** `POST /api/v1/promotions/validate` — returns discount amount and final price.
+
+---
+
+### RADIUS Templates
+
+**Path:** `/templates`
+
+Save reusable sets of `radcheck`/`radreply` attributes as named templates.
+
+**Use cases:**
+- "VIP Package" — high speed + unlimited data
+- "Expired Account" — set all users to expired state
+- "School Network" — content filter attributes
+
+Apply a template to any number of users in one click. Clone templates to create variations.
+
+---
+
+### Bulk Operations
+
+**Path:** `/bulk`
+
+Perform mass actions on multiple RADIUS users simultaneously.
+
+| Action | Description |
+|---|---|
+| `suspend` | Set Simultaneous-Use to 0 |
+| `activate` | Restore Simultaneous-Use |
+| `delete` | Remove users and all their RADIUS attributes |
+| `change_plan` | Assign a new plan to all selected users |
+| `set_expiry` | Set expiry date for all selected users |
+| `apply_template` | Apply a RADIUS template to all selected users |
+| `reset_attributes` | Clear all radcheck/radreply entries |
+
+All bulk operations are logged to the `bulk_operations` history table.
+
+---
+
+### SMS Notifications
+
+**Path:** `/sms`
+
+Send text messages via any HTTP SMS gateway.
+
+- Send individual SMS to a user's phone number
+- Bulk expiry notification (all users expiring in N days)
+- SMS log with delivery status
+- Template variables: `{name}`, `{expiry}`, `{username}`
+
+**Supported gateways:** Any HTTP/REST gateway (Africa's Talking, Twilio, BulkSMS, etc.)
+
+---
+
+### Email Alerts
+
+**Path:** `/alerts`
+
+Define rules that trigger email notifications when conditions are met.
+
+| Condition | Example trigger |
+|---|---|
+| Failed auth rate | > 50 failures per hour |
+| NAS offline | Device unreachable for > 5 minutes |
+| User quota | User exceeds 80% of data quota |
+
+Emails are sent via the configured SMTP server.
+
+---
+
+### Webhooks
+
+**Path:** `/webhooks`
+
+Register external HTTP endpoints to receive real-time event notifications.
+
+**Available events:**
+- `user.created` · `user.deleted` · `user.suspended`
+- `invoice.paid` · `invoice.created`
+- `nas.offline` · `nas.online`
+- `session.started` · `session.stopped`
+
+**Security:** Every delivery is signed with `X-Signature: sha256=<hmac>` using your webhook secret. Verify it server-side to authenticate the payload.
+
+**Retry:** Failed deliveries are logged to `webhook_logs` with HTTP status and response body.
+
+---
+
+### Scheduler
+
+**Path:** `/scheduler`
+
+Built-in background task runner. Configure recurring jobs:
+
+| Task | Default Schedule | Description |
+|---|---|---|
+| Expire Users | Daily 00:05 | Suspends users past their expiry date |
+| Cleanup Sessions | Every 6 hours | Removes stale open sessions |
+| Invoice Overdue | Daily 00:10 | Marks unpaid invoices older than 30 days as overdue |
+| GeoIP Cache Cleanup | Daily 02:00 | Removes stale GeoIP lookups |
+
+Tasks can be enabled/disabled, their schedule changed (cron syntax), and run manually.
+
+---
+
+### API Keys
+
+**Path:** `/api-keys`
+
+Generate bearer tokens for external systems to authenticate with the API without using admin credentials.
+
+```http
+GET /api/v1/radius/users
+Authorization: ApiKey frm_xxxxxxxxxxxxxxxx
 ```
-aaa new-model
-radius server RADIUS-MGR
- address ipv4 YOUR_SERVER_IP auth-port 1812 acct-port 1813
- key YOUR_RADIUS_SECRET
 
-aaa group server radius RADIUS-GROUP
- server name RADIUS-MGR
+Keys can be:
+- Named and scoped
+- Enabled/disabled without deletion
+- Rotated (delete old + create new)
 
-aaa authentication login default group RADIUS-GROUP local
-aaa accounting network default start-stop group RADIUS-GROUP
-```
+---
 
-### Cisco WLC (Wireless LAN Controller)
+### Reports & Analytics
 
-Go to **Security → AAA → RADIUS → Authentication** and add:
-- Server IP: `YOUR_SERVER_IP`
-- Port: `1812`
-- Shared Secret: `YOUR_RADIUS_SECRET`
+**Path:** `/reports`
 
-Then under **Security → AAA → RADIUS → Accounting**, add the same server with port `1813`.
+| Report | Description |
+|---|---|
+| Usage Summary | Total auth attempts, accepts, rejects, sessions |
+| Daily Trend | Auth success/failure counts per day (30 days) |
+| NAS Usage | Per-device session counts and data transferred |
+| Top Users | Highest data consumers |
+| Auth History | Full `radpostauth` log with filter |
+| Export | Download reports as CSV |
 
-### Ubiquiti UniFi
+---
 
-Go to **Settings → Profiles → RADIUS** and click **Create New**:
-- RADIUS Auth Server: `YOUR_SERVER_IP` port `1812`
-- RADIUS Accounting Server: `YOUR_SERVER_IP` port `1813`
-- Shared Secret: `YOUR_RADIUS_SECRET`
+### Live Stats (SSE)
 
-Assign the profile to a wireless network under **Settings → WiFi**.
+The dashboard receives real-time updates every 5 seconds via **Server-Sent Events** without page refresh.
 
-### pfSense / OPNsense (Captive Portal)
+**Live counters:**
+- Total active sessions
+- Auth attempts (last 60 seconds)
+- Online NAS devices
+- Failed auth rate
 
-Navigate to **Services → Captive Portal → Edit Zone → RADIUS**:
-- Primary Authentication Server: `YOUR_SERVER_IP`
-- Authentication Port: `1812`
-- Accounting Port: `1813`
-- Shared Secret: `YOUR_RADIUS_SECRET`
+The SSE stream is authenticated via `?token=<jwt>` query parameter (EventSource does not support custom headers).
 
-### Huawei / H3C / TP-Link Omada
+---
 
-```
-radius-server authentication YOUR_SERVER_IP 1812 key YOUR_RADIUS_SECRET
-radius-server accounting YOUR_SERVER_IP 1813 key YOUR_RADIUS_SECRET
-aaa authentication-scheme radius
-aaa accounting-scheme radius
-```
+### Network Map
+
+**Path:** `/network-map`
+
+Visual representation of all NAS devices showing:
+- Online / offline status (color coded)
+- Active user count per device
+- Ping latency
+- Zone grouping
+
+---
+
+### Security Suite (Tier 7)
+
+#### Security Center
+**Path:** `/security`
+
+Unified security dashboard showing:
+- Unread high/critical alert count
+- Active blocked IPs
+- Honeypot probes today
+- Failed auth rate (last hour)
+- Credential stuffing patterns detected
+- 24-hour auth failure bar chart
+- Alert feed with severity filter and acknowledge
+
+#### RADIUS Simulator
+**Path:** `/security/simulator`
+
+Send real `Access-Request` UDP packets to FreeRADIUS and inspect every detail of the exchange:
+- Full request attribute list (User-Name, NAS-IP, Service-Type, etc.)
+- Full reply attribute list (Reply-Message, Framed-IP-Address, etc.)
+- Raw packet hex dumps for both request and reply
+- Latency measurement
+- Batch mode: test up to 20 username/password pairs at once
+
+**Use cases:** verify a user's credentials work, debug attribute delivery, test NAS connectivity.
+
+#### GeoIP Enforcement
+Looks up the country, city, ISP, and VPN status of any IP address using ip-api.com (no API key required, results cached for 24 hours).
+
+**Rule actions:**
+- `block` — flag for immediate access denial
+- `flag` — raise a security alert but allow access
+- `allow` — whitelist (useful to override a broad block rule)
+
+#### Honeypot Listener
+A silent decoy RADIUS server running on UDP port 11812. Legitimate clients never contact it — only scanners and attackers do.
+
+- Logs every probe: source IP, username attempted, NAS IP, raw attributes
+- Raises a `high`-severity security alert on first contact from a new IP
+- Responds with `Access-Reject` to slow down attackers without revealing it's a honeypot
+
+**Enable/disable:** via `honeypot_enabled` setting in the database.
+
+#### Credential Stuffing Detection
+
+**Realtime (sliding window):**
+- Tracks failed authentication attempts per source IP in memory
+- When `cs_max_fails` failures occur within `cs_window_secs` seconds, the IP is automatically blocked for `cs_block_mins` minutes
+- A `critical` security alert is raised immediately
+- Block records persist in the database and survive restarts
+
+**Pattern Analysis (background):**
+- Runs every 5 minutes
+- Scans `radpostauth` for IPs that tried 5+ different usernames in 10 minutes (distributed credential stuffing)
+- Raises `high`-severity alerts per attacker IP
 
 ---
 
 ## API Reference
 
-Base URL: `http://YOUR_SERVER:8088/api/v1`
-
-All endpoints except `/auth/login`, `/setup/status`, and `/health` require:
-```
-Authorization: Bearer <access_token>
-```
-
-### Health
-
-```
-GET  /health
-GET  /api/v1/health
-```
-Returns `{"status":"ok","services":{"database":"ok"}}` when healthy.
-
-### Setup Wizard (first run only)
-
-```
-GET  /api/v1/setup/status     — check if setup is required
-POST /api/v1/setup/complete   — submit wizard form
-```
-Both endpoints return **404** once setup has been completed.
+All API endpoints are under `/api/v1/`. Authentication is via `Authorization: Bearer <jwt>` header or `ApiKey <key>` for API key auth.
 
 ### Authentication
 
 | Method | Path | Description |
 |---|---|---|
-| POST | `/auth/login` | Login → returns `access_token` + `refresh_token` |
-| POST | `/auth/refresh` | Exchange refresh token for new access token |
-| POST | `/auth/logout` | Revoke refresh token |
-| POST | `/auth/change-password` | Change own password |
-| POST | `/auth/mfa/setup` | Get TOTP QR code |
-| POST | `/auth/mfa/verify` | Confirm TOTP and enable MFA |
+| `POST` | `/auth/login` | Login with username + password, returns JWT |
+| `POST` | `/auth/refresh` | Exchange refresh token for new access token |
+| `POST` | `/auth/logout` | Invalidate current session |
+| `POST` | `/auth/change-password` | Change own password |
 
 ### RADIUS Users
 
-| Method | Path | Min Role | Description |
-|---|---|---|---|
-| GET | `/radius/users` | Operator | List all RADIUS users (paginated) |
-| POST | `/radius/users` | Admin | Create a new RADIUS user |
-| GET | `/radius/users/:id` | Operator | Get user details |
-| PUT | `/radius/users/:id` | Admin | Update user |
-| DELETE | `/radius/users/:id` | Admin | Delete user |
-| POST | `/radius/users/:id/reset-password` | Operator | Reset user password |
-| POST | `/radius/users/:id/suspend` | Admin | Suspend user account |
-| POST | `/radius/users/:id/activate` | Admin | Activate suspended account |
-| POST | `/radius/users/:id/disconnect` | Admin | Force disconnect active sessions |
-| GET | `/radius/users/:id/sessions` | Operator | User session history |
-| POST | `/radius/users/import` | Admin | Bulk import via CSV |
-| GET | `/radius/users/export` | Admin | Export all users to CSV |
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/radius/users` | List users (paginated, searchable) |
+| `POST` | `/radius/users` | Create user |
+| `GET` | `/radius/users/:id` | Get single user |
+| `PUT` | `/radius/users/:id` | Update user |
+| `DELETE` | `/radius/users/:id` | Delete user |
+| `POST` | `/radius/users/import` | Bulk import from CSV |
+| `GET` | `/radius/users/export` | Export all users as CSV |
+| `POST` | `/radius/users/:id/disconnect` | Send CoA Disconnect-Request |
 
 ### NAS Devices
 
-| Method | Path | Min Role | Description |
-|---|---|---|---|
-| GET | `/nas` | Operator | List all NAS devices |
-| POST | `/nas` | Admin | Add a NAS device |
-| GET | `/nas/:id` | Operator | Get NAS details |
-| PUT | `/nas/:id` | Admin | Update NAS device |
-| DELETE | `/nas/:id` | Admin | Remove NAS device |
-| POST | `/nas/:id/test` | Admin | Test RADIUS connectivity |
-| POST | `/nas/discover` | Admin | Auto-discover NAS on local subnet |
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/nas` | List NAS devices |
+| `POST` | `/nas` | Add NAS device |
+| `PUT` | `/nas/:id` | Update NAS device |
+| `DELETE` | `/nas/:id` | Delete NAS device |
+| `POST` | `/nas/:id/test` | Test RADIUS connectivity |
 
-### Sessions & Logs
-
-| Method | Path | Min Role | Description |
-|---|---|---|---|
-| GET | `/sessions/active` | Operator | All active sessions |
-| GET | `/sessions/user/:username` | Operator | Sessions for a specific user |
-| GET | `/logs/auth` | Operator | Authentication logs |
-| GET | `/logs/audit` | Admin | Admin action audit trail |
-
-### Statistics
-
-| Method | Path | Min Role | Description |
-|---|---|---|---|
-| GET | `/statistics/dashboard` | Operator | Dashboard stats (users, sessions, top NAS) |
-
-### System (Super Admin only)
+### Security (Tier 7)
 
 | Method | Path | Description |
 |---|---|---|
-| GET | `/settings` | Get system settings |
-| PUT | `/settings` | Update system settings |
-| POST | `/backup` | Create database backup |
-| GET | `/backups` | List available backups |
-| POST | `/restore` | Restore from backup |
+| `GET` | `/security/summary` | Security health snapshot |
+| `GET` | `/security/alerts` | List alerts (filter by severity/type) |
+| `PUT` | `/security/alerts/:id/ack` | Acknowledge alert |
+| `PUT` | `/security/alerts/ack-all` | Acknowledge all alerts |
+| `DELETE` | `/security/alerts/:id` | Delete alert |
+| `GET` | `/security/blocked-ips` | List blocked IPs |
+| `POST` | `/security/blocked-ips` | Manually block an IP |
+| `DELETE` | `/security/blocked-ips/:id` | Unblock an IP |
+| `GET` | `/security/geoip/lookup?ip=x.x.x.x` | GeoIP lookup |
+| `GET` | `/security/geoip/rules` | List country rules |
+| `POST` | `/security/geoip/rules` | Add country rule |
+| `DELETE` | `/security/geoip/rules/:id` | Delete country rule |
+| `GET` | `/security/honeypot/status` | Honeypot status |
+| `GET` | `/security/honeypot/logs` | Honeypot probe logs |
+| `DELETE` | `/security/honeypot/logs` | Clear old honeypot logs |
+| `POST` | `/radius/simulate` | Simulate RADIUS auth (single) |
+| `POST` | `/radius/simulate/batch` | Simulate RADIUS auth (batch) |
+
+---
+
+## Connecting Network Devices
+
+### MikroTik RouterOS
+
+```routeros
+/radius
+add address=<SERVER_IP> secret=<RADIUS_SECRET> service=login,hotspot timeout=3s
+
+/ip hotspot profile
+set [find] use-radius=yes
+
+/ip hotspot user profile
+set [find] use-radius=yes
+```
+
+### Cisco IOS
+
+```ios
+aaa new-model
+aaa authentication login default group radius local
+aaa authorization exec default group radius local
+
+radius server RADIUS-SRV
+ address ipv4 <SERVER_IP> auth-port 1812 acct-port 1813
+ key <RADIUS_SECRET>
+```
+
+### Ubiquiti UniFi
+
+1. Settings → Profiles → RADIUS → Create New
+2. IP: `<SERVER_IP>`, Port: `1812`, Secret: `<RADIUS_SECRET>`
+3. Assign profile to SSID
+
+### OpenWRT / Hostapd
+
+```
+/etc/config/wireless:
+option auth_server <SERVER_IP>
+option auth_port 1812
+option auth_secret <RADIUS_SECRET>
+option acct_server <SERVER_IP>
+option acct_port 1813
+option acct_secret <RADIUS_SECRET>
+```
+
+> See [DEVICE-INTEGRATION.md](./DEVICE-INTEGRATION.md) for full step-by-step guides for 15+ device types.
 
 ---
 
 ## Operations & Maintenance
 
-### View live logs
-
+### View container status
 ```bash
-# All services
-docker-compose logs -f
-
-# Individual service
-docker-compose logs -f freeradius
+docker-compose ps
 docker-compose logs -f backend
-docker-compose logs -f frontend
-docker-compose logs -f postgres
+docker-compose logs -f freeradius
 ```
 
 ### Restart a service
-
 ```bash
-docker-compose restart freeradius
 docker-compose restart backend
+docker-compose restart freeradius
 ```
 
-### Stop and start everything
-
+### Database backup
 ```bash
-docker-compose down        # stop, remove containers (data is safe in volumes)
-docker-compose up -d       # start again
+docker exec radius_postgres pg_dump -U radius_user radius > backup_$(date +%Y%m%d).sql
 ```
 
-### Manual database backup
-
+### Database restore
 ```bash
-# Backup
-docker exec radius_postgres pg_dump -U radius_user radius \
-  > backup_$(date +%Y%m%d_%H%M%S).sql
-
-# Restore
-cat backup_20240101_120000.sql | \
-  docker exec -i radius_postgres psql -U radius_user radius
+docker exec -i radius_postgres psql -U radius_user radius < backup_20260101.sql
 ```
 
-### Test RADIUS authentication manually
-
+### Re-initialise the database schema (⚠ destroys all data)
 ```bash
-# Get the current shared secret from the container
-SECRET=$(docker exec radius_freeradius sh -c 'echo $RADIUS_SECRET')
-
-# Test a specific user
-docker exec radius_freeradius radtest USERNAME PASSWORD 127.0.0.1 1812 "$SECRET"
-# Success: "Received Access-Accept"
-# Failure: "Received Access-Reject"
+docker exec -i radius_postgres psql -U radius_user radius < init-db.sql
 ```
 
-### Update to a new version
-
-```bash
-git pull
-docker-compose down
-docker-compose build --no-cache
-docker-compose up -d
-```
-
-### Factory Reset
-
-Wipes all data and allows the setup wizard to run again:
-
-```bash
-docker-compose down
-docker volume rm free_postgres_data free_radius_logs
-docker-compose up -d --build
-```
-
-> **Warning:** This deletes all users, sessions, NAS devices, and logs permanently.
+### Scale horizontally
+The backend is stateless — run multiple replicas behind a load balancer. The PostgreSQL database is the single source of truth.
 
 ---
 
-## Security Hardening
-
-### Before going to production, complete this checklist:
-
-- [ ] **Change all secrets** — `DB_PASSWORD`, `JWT_SECRET`, `RADIUS_SECRET` in `.env`
-- [ ] **Use strong RADIUS secret** — minimum 20 characters, no dictionary words
-- [ ] **Enable HTTPS** — put Nginx or Traefik in front with Let's Encrypt TLS
-- [ ] **Restrict admin access** — set `ADMIN_IP_WHITELIST=10.0.0.0/8` (your management network)
-- [ ] **Enable MFA** — go to profile settings and scan the QR code with Google Authenticator
-- [ ] **Firewall rules** — only expose ports `8081/TCP`, `1812/UDP`, `1813/UDP` to the internet
-- [ ] **Review NAS clients** — remove the default "localhost" NAS entry if not needed
-- [ ] **Set session timeout** — reduce `SESSION_TIMEOUT` to `1800` (30 min) for sensitive environments
-- [ ] **Configure email** — set SMTP variables for password reset and alert notifications
-
-### Recommended firewall rules (ufw example)
+## Upgrading
 
 ```bash
-sudo ufw allow 8081/tcp      # web UI — restrict to your office IP in production
-sudo ufw allow 1812/udp      # RADIUS auth — only from NAS device IPs
-sudo ufw allow 1813/udp      # RADIUS accounting — only from NAS device IPs
-sudo ufw deny 8088/tcp       # backend API — never expose directly, only via nginx
-sudo ufw deny 5432/tcp       # PostgreSQL — internal only
+# Pull latest code
+git pull origin main
+
+# Rebuild and restart services
+docker-compose build backend frontend
+docker-compose up -d
+
+# Apply any new database migrations
+docker exec -i radius_postgres psql -U radius_user radius < init-db.sql
 ```
 
-### HTTPS with Nginx reverse proxy
-
-```nginx
-server {
-    listen 443 ssl;
-    server_name radius.yourdomain.com;
-
-    ssl_certificate     /etc/letsencrypt/live/radius.yourdomain.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/radius.yourdomain.com/privkey.pem;
-
-    location / {
-        proxy_pass http://localhost:8081;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
-
-server {
-    listen 80;
-    server_name radius.yourdomain.com;
-    return 301 https://$host$request_uri;
-}
-```
+> Schema migrations use `CREATE TABLE IF NOT EXISTS` and `INSERT ... ON CONFLICT DO NOTHING` — safe to re-run.
 
 ---
 
 ## Troubleshooting
 
-### Web UI not loading
-
+### Login fails with "Internal Server Error"
 ```bash
-# Check all containers are running
-docker-compose ps
-
-# Check frontend logs
-docker-compose logs frontend
+docker logs radius_backend | tail -50
+# Check DB_PASSWORD in .env matches the postgres container
 ```
 
-Common causes:
-- Port `8081` already in use → change `ports: - "8081:80"` in `docker-compose.yml`
-- Frontend build failed → run `docker-compose build --no-cache frontend`
+### RADIUS test shows "Unreachable"
+1. Verify `RADIUS_HOST` in `.env` is `freeradius` (not `localhost`)
+2. Check FreeRADIUS is running: `docker-compose ps freeradius`
+3. Check the shared secret matches both `.env` and the NAS device config
 
----
+### Users can't authenticate from NAS
+1. Go to NAS Devices → Test — confirm "Access-Accept" response
+2. Check the NAS shared secret matches the one in the database
+3. Run RADIUS Simulator with the exact username/password to isolate the issue
 
-### Cannot log in after setup
+### Honeypot won't start
+- Ensure port 11812/udp is not already in use: `ss -ulnp | grep 11812`
+- Check `honeypot_enabled` setting in Admin → Settings is `true`
 
+### "Failed to configure RADIUS attributes" on user create
+- Password must be at least 6 characters
+- Username must be unique (not already in `radcheck`)
+
+### Frontend shows "System Error" badge
 ```bash
-# Verify the backend is up
 curl http://localhost:8088/api/v1/health
-
-# Check backend logs for auth errors
-docker-compose logs backend | grep -i error
+# Should return {"status":"ok","services":{"database":"ok"}}
 ```
-
-Common causes:
-- Wrong password → check what you entered in the wizard
-- Backend not running → `docker-compose restart backend`
-
----
-
-### RADIUS: "Access-Reject" for a user
-
-```bash
-# 1. Check the user exists in radcheck
-docker exec radius_postgres psql -U radius_user -d radius \
-  -c "SELECT * FROM radcheck WHERE username='USERNAME';"
-
-# 2. Test directly from inside the FreeRADIUS container
-SECRET=$(docker exec radius_freeradius sh -c 'echo $RADIUS_SECRET')
-docker exec radius_freeradius radtest USERNAME PASSWORD 127.0.0.1 1812 "$SECRET"
-
-# 3. Check FreeRADIUS auth log
-docker logs radius_freeradius 2>&1 | grep USERNAME | tail -10
-```
-
-Common causes:
-- User doesn't exist → create via web UI
-- Wrong password → reset via web UI
-- User suspended → activate via web UI
-- `Cleartext-Password` stored with wrong attribute name → check radcheck table
-
----
-
-### RADIUS: "Unknown client" error
-
-```bash
-docker logs radius_freeradius 2>&1 | grep "unknown client"
-```
-
-Means the NAS device IP is not in `clients.conf`. Fix:
-1. Add the NAS via the web UI under **NAS Devices**
-2. Or verify the NAS IP is within the configured CIDR ranges (`172.x.x.x/16`, `10.x.x.x/8`, `192.168.x.x/16`)
-
----
-
-### RADIUS: "Shared secret is incorrect"
-
-The NAS device is using a different shared secret than what is configured in RADIUS Manager. Fix:
-1. Check `RADIUS_SECRET` in your `.env`
-2. Re-run `docker-compose down && docker-compose up -d` so FreeRADIUS picks up the new value
-3. Update the shared secret on the NAS device to match
-
----
-
-### RADIUS: SQL "Ignoring" warning at startup
-
-```
-Warning: Ignoring "sql" (see raddb/mods-available/README.rst)
-```
-
-This means FreeRADIUS cannot load the SQL module. Run:
-
-```bash
-# Check the actual mods-available/sql inside the container
-docker exec radius_freeradius cat /etc/freeradius/mods-available/sql
-
-# Check DB credentials are correctly substituted
-docker exec radius_freeradius grep -E "server|login|password" /etc/freeradius/mods-available/sql
-
-# Force a full rebuild
-docker-compose down
-docker-compose build --no-cache freeradius
-docker-compose up -d
-```
-
----
-
-### Database connection error in backend
-
-```bash
-# Check PostgreSQL is healthy
-docker-compose ps postgres
-
-# Check backend environment
-docker exec radius_backend env | grep DB_
-
-# Verify connection manually
-docker exec radius_postgres psql -U radius_user -d radius -c "SELECT 1;"
-```
-
----
-
-### Port already in use
-
-```bash
-# See what is using the port
-sudo ss -tulnp | grep -E ':8081|:1812|:1813|:8088'
-
-# Stop conflicting containers from previous runs
-docker-compose down --remove-orphans
-docker-compose up -d
-```
+If database is "error", check PostgreSQL is running and credentials are correct.
 
 ---
 
 ## FAQ
 
-**Q: Can I use this with an existing FreeRADIUS installation?**
-No — this stack manages its own FreeRADIUS container. You can export the user data from RADIUS Manager and import it into an external FreeRADIUS.
+**Q: Can I use this without Docker?**  
+A: Yes. Install Go 1.21+, PostgreSQL 15, and FreeRADIUS 3.2 manually. Set all environment variables and run `go build -o radius-manager ./...` inside the `backend/` folder.
 
-**Q: Does it support EAP-TLS (certificate-based auth)?**
-FreeRADIUS 3.2 supports EAP-TLS. The default configuration enables PEAP and EAP-TTLS out of the box. For EAP-TLS you need to generate and install client certificates in the FreeRADIUS `certs/` directory.
+**Q: Does it support LDAP or Active Directory?**  
+A: Not natively. FreeRADIUS supports LDAP via `rlm_ldap` — configure it in the FreeRADIUS config files and the manager will still track sessions and accounting.
 
-**Q: How do I add more supported Docker bridge subnets?**
-Edit `freeradius/clients.conf`, add a new `client` block for your subnet, and run:
+**Q: Is the data encrypted at rest?**  
+A: RADIUS passwords are stored as `Cleartext-Password` in PostgreSQL by default (required by PAP/CHAP). For EAP/PEAP with MS-CHAP, use `NT-Password`. Encrypt the database volume using OS-level encryption (LUKS) for at-rest protection.
+
+**Q: How many users can it handle?**  
+A: PostgreSQL handles millions of rows comfortably. FreeRADIUS is designed for high-throughput auth. Performance depends on hardware; 10,000+ concurrent sessions is achievable on modest hardware.
+
+**Q: Can I white-label this?**  
+A: Yes. Change the app name in `frontend/src/components/layout/AppLayout.vue` and update the logo URL in the `.env` file.
+
+**Q: How do I reset the admin password?**  
 ```bash
-docker-compose build --no-cache freeradius && docker-compose up -d freeradius
+# Generate a new bcrypt hash
+docker exec radius_backend sh -c 'echo -n "NewPassword123!" | htpasswd -niB x | cut -d: -f2'
+
+# Update the database
+docker exec radius_postgres psql -U radius_user radius \
+  -c "UPDATE app_users SET password_hash='\$2y\$...' WHERE username='admin';"
 ```
 
-**Q: The setup wizard ran but I want to change the admin password.**
-Log in and go to your **Profile → Change Password**, or use the admin user management screen if you are a super admin.
+**Q: Can multiple admins use it simultaneously?**  
+A: Yes. The backend is fully stateless with JWT authentication. Multiple sessions work independently.
 
-**Q: Can I run multiple instances for different ISP zones?**
-Yes — deploy separate stacks in separate directories (or with different `COMPOSE_PROJECT_NAME` values) on different ports.
+---
 
-**Q: How do I completely wipe all data and start over?**
-```bash
-docker-compose down
-docker volume rm free_postgres_data free_radius_logs
-docker-compose up -d --build
-```
+## Contributing
+
+Contributions are welcome.
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feat/my-feature`
+3. Commit your changes: `git commit -m "feat: add my feature"`
+4. Push: `git push origin feat/my-feature`
+5. Open a Pull Request
+
+Please follow the existing code style (Go: `gofmt`, Vue: Composition API + `<script setup>`).
 
 ---
 
 ## License
 
-MIT — Free to use, modify, and deploy in production.
+This project is licensed under the **MIT License** — see [LICENSE](LICENSE) for details.
+
+---
+
+<div align="center">
+Built with ❤ for network engineers and ISPs worldwide.<br>
+<a href="https://github.com/phinias955/FreeRADIUS-Manager-Tool">github.com/phinias955/FreeRADIUS-Manager-Tool</a>
+</div>
