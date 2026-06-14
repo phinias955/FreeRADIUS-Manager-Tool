@@ -33,6 +33,7 @@ services:
       DB_NAME: ${DB_NAME:-radius}
       DB_USER: ${DB_USER:-radius_user}
       DB_PASS: ${DB_PASSWORD:-ChangeMe_Secure_Pass123!}
+      RADIUS_SECRET: ${RADIUS_SECRET:-testing123}
     volumes:
       - radius_logs:/var/log/freeradius
     depends_on:
@@ -58,7 +59,7 @@ services:
       RADIUS_HOST: freeradius
       RADIUS_AUTH_PORT: ${RADIUS_AUTH_PORT:-1812}
       RADIUS_ACCT_PORT: ${RADIUS_ACCT_PORT:-1813}
-      RADIUS_SECRET: ${RADIUS_SECRET:-testing123-please-change-in-production}
+      RADIUS_SECRET: ${RADIUS_SECRET:-testing123}
       RADIUS_TIMEOUT: ${RADIUS_TIMEOUT:-5s}
       RADIUS_RETRIES: ${RADIUS_RETRIES:-3}
       WEB_PORT: 8088

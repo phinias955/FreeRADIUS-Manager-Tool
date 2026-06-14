@@ -372,6 +372,7 @@
 import { ref, reactive, computed, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { setupAPI } from '@/api/index'
+import { markSetupComplete } from '@/router'
 
 const router = useRouter()
 
@@ -391,7 +392,7 @@ const showSecret = ref(false)
 const submitting = ref(false)
 const submitError = ref('')
 const completed = ref(false)
-const redirectCountdown = ref(5)
+const redirectCountdown = ref(3)
 let countdownTimer = null
 
 const form = reactive({
@@ -532,11 +533,15 @@ async function submitSetup() {
       },
     })
     completed.value = true
+    // Lock the router cache immediately — /setup is no longer accessible
+    markSetupComplete()
+    redirectCountdown.value = 3
     countdownTimer = setInterval(() => {
       redirectCountdown.value--
       if (redirectCountdown.value <= 0) {
         clearInterval(countdownTimer)
-        router.push('/login')
+        // replace() removes /setup from browser history so back button can't return
+        router.replace('/login')
       }
     }, 1000)
   } catch (err) {

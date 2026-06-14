@@ -25,11 +25,11 @@ type RadiusUser struct {
 // CreateRadiusUserRequest is the request body for creating a RADIUS user.
 type CreateRadiusUserRequest struct {
 	Username            string  `json:"username" binding:"required,min=2,max=64"`
-	Password            string  `json:"password" binding:"required,min=12"`
+	Password            string  `json:"password" binding:"required,min=6"`
 	Email               string  `json:"email" binding:"omitempty,email"`
 	FullName            string  `json:"full_name"`
 	Department          string  `json:"department"`
-	DeviceLimit         int     `json:"device_limit" binding:"min=1,max=20"`
+	DeviceLimit         int     `json:"device_limit" binding:"omitempty,min=1,max=500"`
 	AccountExpiry       *string `json:"account_expiry"`
 	ForcePasswordChange bool    `json:"force_password_change"`
 }
@@ -39,14 +39,14 @@ type UpdateRadiusUserRequest struct {
 	Email               string  `json:"email" binding:"omitempty,email"`
 	FullName            string  `json:"full_name"`
 	Department          string  `json:"department"`
-	DeviceLimit         *int    `json:"device_limit" binding:"omitempty,min=1,max=20"`
+	DeviceLimit         *int    `json:"device_limit" binding:"omitempty,min=1,max=500"`
 	AccountExpiry       *string `json:"account_expiry"`
 	ForcePasswordChange *bool   `json:"force_password_change"`
 }
 
 // ResetPasswordRequest is used to reset a RADIUS user's password.
 type ResetPasswordRequest struct {
-	NewPassword string `json:"new_password" binding:"required,min=12"`
+	NewPassword string `json:"new_password" binding:"required,min=6"`
 }
 
 // RadiusUserSession represents an active session for a RADIUS user.

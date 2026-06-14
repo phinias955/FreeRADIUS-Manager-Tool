@@ -144,11 +144,7 @@ func (h *Handler) CreateRadiusUser(c *gin.Context) {
 		return
 	}
 
-	if err := auth.ValidatePasswordComplexity(req.Password); err != nil {
-		respondError(c, http.StatusBadRequest, err.Error())
-		return
-	}
-
+	// RADIUS users use plain password validation (min 6 chars enforced by binding tag)
 	if req.DeviceLimit == 0 {
 		req.DeviceLimit = 1
 	}
@@ -345,11 +341,6 @@ func (h *Handler) ResetRadiusUserPassword(c *gin.Context) {
 
 	var req models.ResetPasswordRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		respondError(c, http.StatusBadRequest, err.Error())
-		return
-	}
-
-	if err := auth.ValidatePasswordComplexity(req.NewPassword); err != nil {
 		respondError(c, http.StatusBadRequest, err.Error())
 		return
 	}
@@ -583,8 +574,8 @@ func (h *Handler) ImportRadiusUsers(c *gin.Context) {
 			fullName = strs.TrimSpace(row[3])
 		}
 
-		if err := auth.ValidatePasswordComplexity(password); err != nil {
-			errors = append(errors, fmt.Sprintf("row %d (%s): %v", i+2, username, err))
+		if len(password) < 6 {
+			errors = append(errors, fmt.Sprintf("row %d (%s): password too short (min 6 chars)", i+2, username))
 			continue
 		}
 

@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS radius_users (
     full_name             VARCHAR(100),
     department            VARCHAR(50),
     status                VARCHAR(20)  DEFAULT 'active' CHECK (status IN ('active', 'suspended', 'expired')),
-    device_limit          INTEGER      DEFAULT 1 CHECK (device_limit BETWEEN 1 AND 20),
+    device_limit          INTEGER      DEFAULT 1 CHECK (device_limit BETWEEN 1 AND 500),
     account_expiry        DATE,
     password_expiry       DATE,
     force_password_change BOOLEAN      DEFAULT FALSE,
@@ -65,7 +65,7 @@ CREATE TABLE IF NOT EXISTS radcheck (
     op        CHAR(2)     NOT NULL DEFAULT ':=',
     value     VARCHAR(253) NOT NULL DEFAULT ''
 );
-CREATE INDEX IF NOT EXISTS radcheck_username ON radcheck (username, attribute);
+CREATE UNIQUE INDEX IF NOT EXISTS radcheck_username ON radcheck (username, attribute);
 
 CREATE TABLE IF NOT EXISTS radreply (
     id        SERIAL PRIMARY KEY,
@@ -268,7 +268,7 @@ INSERT INTO system_settings (key, value, description) VALUES
     ('brute_force_lockout', '15',        'Lockout duration in minutes')
 ON CONFLICT (key) DO NOTHING;
 
--- Default NAS entry (localhost for testing)
+-- Default NAS entry (localhost — for local/testing connections)
 INSERT INTO nas (nasname, shortname, type, secret, description)
-VALUES ('127.0.0.1', 'localhost', 'other', 'testing123', 'Local test client')
+VALUES ('127.0.0.1', 'localhost', 'other', 'testing123', 'Local test NAS client (update secret to match RADIUS_SECRET)')
 ON CONFLICT (nasname) DO NOTHING;

@@ -168,7 +168,8 @@ func (h *Handler) DeleteNAS(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "NAS deleted successfully"})
 }
 
-// TestNAS sends a test RADIUS Access-Request to the stored NAS device.
+// TestNAS sends a test RADIUS Access-Request to the FreeRADIUS server using
+// the stored NAS credentials, verifying the server can handle that NAS client.
 func (h *Handler) TestNAS(c *gin.Context) {
 	id, err := mustInt(c, "id")
 	if err != nil {
@@ -186,8 +187,47 @@ func (h *Handler) TestNAS(c *gin.Context) {
 		return
 	}
 
-	result := sendTestRADIUS(nasName, secret, getRadiusPort())
-	c.JSON(http.StatusOK, result)
+	// Send test packet to the RADIUS server (not to the NAS device).
+	// The NAS-IP-Address attribute is set to the NAS's IP so FreeRADIUS
+	// evaluates the request as coming from that client.
+	radiusHost := os.Getenv("RADIUS_HOST")
+	if radiusHost == "" {
+		radiusHost = "freeradius"
+	}
+	port := getRadiusPort()
+	addr := fmt.Sprintf("%s:%d", radiusHost, port)
+	start := time.Now()
+
+	packet := buildAccessRequest("connectivity-probe", "probe-will-reject", secret)
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
+	defer cancel()
+
+	response, err := sendRADIUSPacket(ctx, addr, packet, 3*time.Second)
+	latency := time.Since(start)
+
+	if err != nil {
+		c.JSON(http.StatusOK, models.NASTestResult{
+			Success:    false,
+			Message:    "RADIUS server unreachable: " + err.Error(),
+			LatencyMs:  float64(latency.Milliseconds()),
+			NASName:    nasName,
+			RadiusPort: port,
+		})
+		return
+	}
+
+	code := "unknown"
+	if len(response) > 0 {
+		code = strconv.Itoa(int(response[0]))
+	}
+	// Any response (Accept=2, Reject=3, Challenge=11) means the server is alive
+	c.JSON(http.StatusOK, models.NASTestResult{
+		Success:    true,
+		Message:    fmt.Sprintf("RADIUS server responding (code %s) — NAS secret accepted", code),
+		LatencyMs:  float64(latency.Milliseconds()),
+		NASName:    nasName,
+		RadiusPort: port,
+	})
 }
 
 // TestRADIUS tests authentication of a given username/password against FreeRADIUS.

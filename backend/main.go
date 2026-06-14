@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -16,6 +17,43 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
+)
+
+// setupState caches whether setup has been completed so we only hit the DB once.
+var (
+	setupDone   bool
+	setupDoneMu sync.RWMutex
+)
+
+// markSetupDone caches the completed state in memory (irreversible).
+func markSetupDone() {
+	setupDoneMu.Lock()
+	setupDone = true
+	setupDoneMu.Unlock()
+}
+
+// isSetupDone checks in-memory cache first, then DB.
+func isSetupDone(db *database.DB) bool {
+	setupDoneMu.RLock()
+	cached := setupDone
+	setupDoneMu.RUnlock()
+	if cached {
+		return true
+	}
+	var val string
+	db.QueryRow(`SELECT value FROM system_settings WHERE key = 'setup_complete'`).Scan(&val)
+	if val == "true" {
+		markSetupDone()
+		return true
+	}
+	return false
+}
+
+// setupIPRateLimit is a very simple per-IP request counter for the setup endpoint.
+var (
+	setupIPHits   = map[string]int{}
+	setupIPMu     sync.Mutex
+	maxSetupHits  = 10
 )
 
 func main() {
@@ -57,8 +95,11 @@ func main() {
 	rateLimiter := middleware.NewRateLimiter()
 	router.Use(rateLimiter.Middleware())
 
-	// Health check (no auth required)
-	router.GET("/health", handlers.HealthCheck(db))
+	// Health check (no auth required) — available at both paths so nginx proxy
+	// can forward /api/v1/health and the Docker health-check can hit /health.
+	healthHandler := handlers.HealthCheck(db)
+	router.GET("/health", healthHandler)
+	router.GET("/api/v1/health", healthHandler)
 	router.GET("/api/v1/version", handlers.Version())
 
 	// Initialize handlers
@@ -67,11 +108,36 @@ func main() {
 	// API v1 routes
 	v1 := router.Group("/api/v1")
 	{
-		// First-run setup wizard endpoints (public, idempotency-guarded)
+		// First-run setup wizard endpoints — permanently locked once setup_complete = true
 		setup := v1.Group("/setup")
+		setup.Use(func(c *gin.Context) {
+			// Rate-limit per IP
+			ip := c.ClientIP()
+			setupIPMu.Lock()
+			setupIPHits[ip]++
+			hits := setupIPHits[ip]
+			setupIPMu.Unlock()
+			if hits > maxSetupHits {
+				c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{"error": "too many requests"})
+				return
+			}
+
+			// Once setup is done the endpoint vanishes (404 — no information leak)
+			if isSetupDone(db) {
+				c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": "not found"})
+				return
+			}
+			c.Next()
+		})
 		{
 			setup.GET("/status", h.SetupStatus)
-			setup.POST("/complete", h.SetupComplete)
+			setup.POST("/complete", func(c *gin.Context) {
+				h.SetupComplete(c)
+				// If the handler succeeded, warm the in-memory cache immediately
+				if c.Writer.Status() == http.StatusOK {
+					markSetupDone()
+				}
+			})
 		}
 
 		// Auth endpoints (public)

@@ -1,37 +1,43 @@
 sql {
     dialect = "postgresql"
-    driver = "rlm_sql_postgresql"
+    driver  = "rlm_sql_postgresql"
 
-    server = "${DB_HOST}"
-    port = ${DB_PORT}
-    login = "${DB_USER}"
-    password = "${DB_PASS}"
-    radius_db = "${DB_NAME}"
+    # Connection — placeholders replaced by init.sh at container startup
+    server    = "DB_HOST_PLACEHOLDER"
+    port      = DB_PORT_PLACEHOLDER
+    login     = "DB_USER_PLACEHOLDER"
+    password  = "DB_PASS_PLACEHOLDER"
+    radius_db = "DB_NAME_PLACEHOLDER"
 
-    acct_table1 = "radacct"
-    acct_table2 = "radacct"
-    postauth_table = "radpostauth"
-    authcheck_table = "radcheck"
-    groupcheck_table = "radgroupcheck"
-    authreply_table = "radreply"
-    groupreply_table = "radgroupreply"
-    usergroup_table = "radusergroup"
+    # Table names (must match init-db.sql schema)
+    acct_table1       = "radacct"
+    acct_table2       = "radacct"
+    postauth_table    = "radpostauth"
+    authcheck_table   = "radcheck"
+    groupcheck_table  = "radgroupcheck"
+    authreply_table   = "radreply"
+    groupreply_table  = "radgroupreply"
+    usergroup_table   = "radusergroup"
+
     delete_stale_sessions = yes
 
     pool {
-        start = 5
-        min = 3
-        max = 32
-        spare = 10
-        uses = 0
-        retry_delay = 30
-        lifetime = 0
+        start        = 5
+        min          = 3
+        max          = 32
+        spare        = 10
+        uses         = 0
+        retry_delay  = 30
+        lifetime     = 0
         idle_timeout = 60
     }
 
+    # Disable reading NAS clients from DB on startup to prevent module
+    # init failure if the connection is briefly unavailable.
     read_clients = yes
-    client_table = "nas"
 
     group_attribute = "SQL-Group"
-    $INCLUDE ${modconfdir}/${.:name}/main/${dialect}/queries.conf
+
+    # Hardcoded path avoids variable-expansion issues in FreeRADIUS 3.2.x
+    $INCLUDE /etc/freeradius/mods-config/sql/main/postgresql/queries.conf
 }

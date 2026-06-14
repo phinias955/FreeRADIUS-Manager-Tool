@@ -16,6 +16,11 @@ async function checkSetupStatus() {
   return setupRequired
 }
 
+// Called by SetupWizard after successful completion — prevents any back-navigation
+export function markSetupComplete() {
+  setupRequired = false
+}
+
 const routes = [
   {
     path: '/setup',

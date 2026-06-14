@@ -1,38 +1,14 @@
 server default {
     listen {
-        type = auth
+        type   = auth
         ipaddr = *
-        port = 0
-        limit {
-            max_connections = 16
-            lifetime = 0
-            idle_timeout = 30
-        }
+        port   = 1812
     }
 
     listen {
+        type   = acct
         ipaddr = *
-        port = 0
-        type = acct
-        limit {}
-    }
-
-    listen {
-        type = auth
-        ipv6addr = ::
-        port = 0
-        limit {
-            max_connections = 16
-            lifetime = 0
-            idle_timeout = 30
-        }
-    }
-
-    listen {
-        ipv6addr = ::
-        port = 0
-        type = acct
-        limit {}
+        port   = 1813
     }
 
     authorize {
@@ -40,14 +16,12 @@ server default {
         preprocess
         chap
         mschap
-        digest
         suffix
         eap {
             ok = return
         }
         files
         sql
-        -ldap
         expiration
         logintime
         pap
@@ -63,7 +37,6 @@ server default {
         Auth-Type MS-CHAP {
             mschap
         }
-        digest
         eap
     }
 
@@ -71,13 +44,10 @@ server default {
         preprocess
         acct_unique
         suffix
-        files
     }
 
     accounting {
-        detail
-        unix
-        -sql
+        sql
         exec
         attr_filter.accounting_response
     }
@@ -90,11 +60,11 @@ server default {
         update {
             &reply: += &session-state:
         }
-        -sql
+        sql
         exec
         remove_reply_message_if_eap
         Post-Auth-Type REJECT {
-            -sql
+            sql
             attr_filter.access_reject
             eap
             remove_reply_message_if_eap
