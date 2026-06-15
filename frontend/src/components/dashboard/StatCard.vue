@@ -7,7 +7,10 @@
       <p class="text-[10px] font-medium text-gray-500 uppercase tracking-wide truncate">{{ title }}</p>
       <div v-if="loading" class="h-6 w-12 bg-gray-200 rounded animate-pulse mt-1"></div>
       <p v-else class="text-xl font-bold text-gray-900 truncate">{{ value }}</p>
-      <p v-if="subtitle && !loading" class="text-[10px] text-gray-400 mt-0.5 truncate">{{ subtitle }}</p>
+      <p v-if="trend != null && !loading" class="text-[10px] mt-0.5 font-medium" :class="trend >= 0 ? 'text-green-600' : 'text-red-600'">
+        {{ trend >= 0 ? '↑' : '↓' }} {{ Math.abs(trend).toFixed(1) }}% vs yesterday
+      </p>
+      <p v-else-if="subtitle && !loading" class="text-[10px] text-gray-400 mt-0.5 truncate">{{ subtitle }}</p>
     </div>
   </div>
 </template>
@@ -23,6 +26,7 @@ const props = defineProps({
   title: String,
   value: [String, Number],
   subtitle: String,
+  trend: Number,
   icon: String,
   color: { type: String, default: 'blue' },
   loading: Boolean,

@@ -253,6 +253,225 @@ func (h *Handler) DashboardStats(c *gin.Context) {
 		}
 	}
 
+	// ── Pro dashboard extensions ────────────────────────────────────────────
+
+	var expiredUsers int
+	h.db.QueryRow(`SELECT COUNT(*) FROM radius_users WHERE status = 'expired'`).Scan(&expiredUsers)
+
+	var yesterdayAuths, yesterdayAccepts int
+	h.db.QueryRow(`SELECT COUNT(*) FROM radpostauth WHERE authdate >= CURRENT_DATE - INTERVAL '1 day' AND authdate < CURRENT_DATE`).Scan(&yesterdayAuths)
+	h.db.QueryRow(`
+		SELECT COUNT(*) FROM radpostauth
+		WHERE authdate >= CURRENT_DATE - INTERVAL '1 day' AND authdate < CURRENT_DATE
+		  AND reply IN ('Access-Accept', '2')`).Scan(&yesterdayAccepts)
+
+	authDelta := todayAuths - yesterdayAuths
+	authDeltaPct := 0.0
+	if yesterdayAuths > 0 {
+		authDeltaPct = float64(authDelta) / float64(yesterdayAuths) * 100
+	}
+
+	var authLast5m, rejectLast5m int
+	h.db.QueryRow(`
+		SELECT
+			COALESCE(SUM(CASE WHEN reply IN ('Access-Accept', '2') THEN 1 ELSE 0 END), 0),
+			COALESCE(SUM(CASE WHEN reply IN ('Access-Reject', 'Reject') OR reply NOT IN ('Access-Accept', '2', '') THEN 1 ELSE 0 END), 0)
+		FROM radpostauth WHERE authdate >= NOW() - INTERVAL '5 minutes'`).Scan(&authLast5m, &rejectLast5m)
+
+	var nasUp, nasDown int
+	h.db.QueryRow(`
+		SELECT
+			COALESCE(SUM(CASE WHEN ping_status = 'up' THEN 1 ELSE 0 END), 0),
+			COALESCE(SUM(CASE WHEN ping_status = 'down' THEN 1 ELSE 0 END), 0)
+		FROM nas WHERE status = 'active'`).Scan(&nasUp, &nasDown)
+
+	var bandwidthInMbps, bandwidthOutMbps float64
+	h.db.QueryRow(`
+		SELECT
+			COALESCE(SUM(acctinputoctets), 0) * 8.0 / 300.0 / 1048576.0,
+			COALESCE(SUM(acctoutputoctets), 0) * 8.0 / 300.0 / 1048576.0
+		FROM radacct
+		WHERE acctstoptime IS NULL AND acctupdatetime >= NOW() - INTERVAL '5 minutes'`).
+		Scan(&bandwidthInMbps, &bandwidthOutMbps)
+
+	var vouchersActive, vouchersUsed, vouchersTotal int
+	h.db.QueryRow(`
+		SELECT
+			COALESCE(SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END), 0),
+			COALESCE(SUM(CASE WHEN status = 'used' THEN 1 ELSE 0 END), 0),
+			COUNT(*)
+		FROM vouchers`).Scan(&vouchersActive, &vouchersUsed, &vouchersTotal)
+
+	var blockedIPs, honeypotToday, critAlerts, unreadAlerts int
+	h.db.QueryRow(`SELECT COUNT(*) FROM cred_stuffing_blocks WHERE blocked_until > NOW()`).Scan(&blockedIPs)
+	h.db.QueryRow(`SELECT COUNT(*) FROM honeypot_logs WHERE created_at >= CURRENT_DATE`).Scan(&honeypotToday)
+	h.db.QueryRow(`SELECT COUNT(*) FROM security_alerts WHERE severity IN ('critical','high') AND is_acknowledged = FALSE`).Scan(&critAlerts)
+	h.db.QueryRow(`SELECT COUNT(*) FROM security_alerts WHERE is_acknowledged = FALSE`).Scan(&unreadAlerts)
+
+	type NASHealth struct {
+		ID        int     `json:"id"`
+		NASName   string  `json:"nasname"`
+		ShortName string  `json:"shortname"`
+		Status    string  `json:"ping_status"`
+		LatencyMs float64 `json:"ping_latency_ms"`
+		LastPing  *time.Time `json:"last_ping"`
+	}
+
+	nasHealthRows, _ := h.db.Query(`
+		SELECT id, nasname, COALESCE(shortname, ''), COALESCE(ping_status, 'unknown'),
+		       COALESCE(ping_latency_ms, 0), last_ping
+		FROM nas WHERE status = 'active'
+		ORDER BY shortname, nasname`)
+
+	nasHealth := []NASHealth{}
+	if nasHealthRows != nil {
+		defer nasHealthRows.Close()
+		for nasHealthRows.Next() {
+			var n NASHealth
+			nasHealthRows.Scan(&n.ID, &n.NASName, &n.ShortName, &n.Status, &n.LatencyMs, &n.LastPing)
+			nasHealth = append(nasHealth, n)
+		}
+	}
+
+	type ActiveSessionBrief struct {
+		SessionID      string     `json:"session_id"`
+		Username       string     `json:"username"`
+		NASIP          string     `json:"nas_ip"`
+		FramedIP       *string    `json:"framed_ip"`
+		CallingStation string     `json:"calling_station"`
+		StartTime      *time.Time `json:"start_time"`
+		Duration       int64      `json:"duration_seconds"`
+		InputBytes     int64      `json:"input_bytes"`
+		OutputBytes    int64      `json:"output_bytes"`
+	}
+
+	sessionRows, _ := h.db.Query(`
+		SELECT acctsessionid, username, nasipaddress::text, framedipaddress::text,
+		       callingstationid, acctstarttime, acctsessiontime,
+		       acctinputoctets, acctoutputoctets
+		FROM radacct WHERE acctstoptime IS NULL
+		ORDER BY acctstarttime DESC LIMIT 8`)
+
+	liveSessions := []ActiveSessionBrief{}
+	if sessionRows != nil {
+		defer sessionRows.Close()
+		for sessionRows.Next() {
+			var s ActiveSessionBrief
+			sessionRows.Scan(&s.SessionID, &s.Username, &s.NASIP, &s.FramedIP,
+				&s.CallingStation, &s.StartTime, &s.Duration, &s.InputBytes, &s.OutputBytes)
+			liveSessions = append(liveSessions, s)
+		}
+	}
+
+	type FailHourStat struct {
+		Hour  string `json:"hour"`
+		Fails int    `json:"fails"`
+	}
+
+	failRows, _ := h.db.Query(`
+		SELECT h.hour, COALESCE(f.fails, 0)
+		FROM generate_series(
+			date_trunc('hour', NOW() - INTERVAL '23 hours'),
+			date_trunc('hour', NOW()),
+			INTERVAL '1 hour'
+		) AS h(hour)
+		LEFT JOIN (
+			SELECT date_trunc('hour', authdate) AS hour, COUNT(*) AS fails
+			FROM radpostauth
+			WHERE authdate >= NOW() - INTERVAL '24 hours'
+			  AND (reply IN ('Access-Reject', 'Reject') OR reply NOT IN ('Access-Accept', '2', ''))
+			GROUP BY 1
+		) f ON f.hour = h.hour
+		ORDER BY h.hour`)
+
+	failTrend24h := []FailHourStat{}
+	if failRows != nil {
+		defer failRows.Close()
+		for failRows.Next() {
+			var s FailHourStat
+			var hour time.Time
+			failRows.Scan(&hour, &s.Fails)
+			s.Hour = hour.Format("2006-01-02 15:04")
+			failTrend24h = append(failTrend24h, s)
+		}
+	}
+
+	type SecurityAlertBrief struct {
+		ID         int       `json:"id"`
+		AlertType  string    `json:"alert_type"`
+		Severity   string    `json:"severity"`
+		IPAddress  *string   `json:"ip_address"`
+		Username   *string   `json:"username"`
+		CreatedAt  time.Time `json:"created_at"`
+	}
+
+	alertRows, _ := h.db.Query(`
+		SELECT id, alert_type, severity, ip_address::text, username, created_at
+		FROM security_alerts
+		ORDER BY created_at DESC LIMIT 6`)
+
+	recentAlerts := []SecurityAlertBrief{}
+	if alertRows != nil {
+		defer alertRows.Close()
+		for alertRows.Next() {
+			var a SecurityAlertBrief
+			alertRows.Scan(&a.ID, &a.AlertType, &a.Severity, &a.IPAddress, &a.Username, &a.CreatedAt)
+			recentAlerts = append(recentAlerts, a)
+		}
+	}
+
+	type AuditBrief struct {
+		ID        int64     `json:"id"`
+		Username  *string   `json:"username"`
+		Action    string    `json:"action"`
+		Details   *string   `json:"details"`
+		CreatedAt time.Time `json:"created_at"`
+	}
+
+	auditRows, _ := h.db.Query(`
+		SELECT al.id, au.username, al.action, al.details::text, al.created_at
+		FROM audit_log al
+		LEFT JOIN app_users au ON au.id = al.user_id
+		ORDER BY al.created_at DESC LIMIT 6`)
+
+	recentAudit := []AuditBrief{}
+	if auditRows != nil {
+		defer auditRows.Close()
+		for auditRows.Next() {
+			var a AuditBrief
+			auditRows.Scan(&a.ID, &a.Username, &a.Action, &a.Details, &a.CreatedAt)
+			recentAudit = append(recentAudit, a)
+		}
+	}
+
+	var peakHour string
+	var peakCount int
+	h.db.QueryRow(`
+		SELECT TO_CHAR(hour, 'HH24:00'), cnt FROM (
+			SELECT date_trunc('hour', authdate) AS hour, COUNT(*) AS cnt
+			FROM radpostauth WHERE authdate >= CURRENT_DATE
+			GROUP BY 1 ORDER BY cnt DESC LIMIT 1
+		) p`).Scan(&peakHour, &peakCount)
+
+	healthStatus := "healthy"
+	healthMessages := []string{}
+	if nasDown > 0 {
+		healthStatus = "critical"
+		healthMessages = append(healthMessages, fmt.Sprintf("%d NAS device(s) offline", nasDown))
+	}
+	if critAlerts > 0 {
+		if healthStatus != "critical" {
+			healthStatus = "degraded"
+		}
+		healthMessages = append(healthMessages, fmt.Sprintf("%d high/critical security alert(s)", critAlerts))
+	}
+	if blockedIPs > 0 && healthStatus == "healthy" {
+		healthStatus = "degraded"
+	}
+	if len(healthMessages) == 0 {
+		healthMessages = append(healthMessages, "All systems operational")
+	}
+
 	// Legacy field: sessions per hour from radacct (kept for compatibility)
 	type LegacyAuthStat struct {
 		Hour     string `json:"hour"`
@@ -269,22 +488,57 @@ func (h *Handler) DashboardStats(c *gin.Context) {
 			"total_users":       totalUsers,
 			"active_users":      activeUsers,
 			"suspended_users":   suspendedUsers,
+			"expired_users":     expiredUsers,
 			"total_nas":         totalNAS,
+			"nas_up":            nasUp,
+			"nas_down":          nasDown,
 			"today_auths":       todayAuths,
 			"today_accepts":     todayAccepts,
 			"today_rejects":     todayRejects,
+			"yesterday_auths":   yesterdayAuths,
+			"auth_delta":        authDelta,
+			"auth_delta_pct":    authDeltaPct,
 			"auth_success_rate": authSuccessRate,
 			"traffic_today":     trafficToday,
 			"traffic_7d":        traffic7d,
+			"peak_hour":         peakHour,
+			"peak_hour_count":   peakCount,
+			"vouchers_active":   vouchersActive,
+			"vouchers_used":     vouchersUsed,
+			"vouchers_total":    vouchersTotal,
+			"blocked_ips":       blockedIPs,
+			"honeypot_today":    honeypotToday,
+			"critical_alerts":   critAlerts,
+			"unread_alerts":     unreadAlerts,
 		},
-		"auth_stats_24h":    legacyStats,
-		"auth_hourly_24h":   authStats24h,
-		"auth_daily_7d":     authStats7d,
+		"live": gin.H{
+			"auth_last_5m":       authLast5m,
+			"reject_last_5m":     rejectLast5m,
+			"bandwidth_in_mbps":  bandwidthInMbps,
+			"bandwidth_out_mbps": bandwidthOutMbps,
+		},
+		"system_health": gin.H{
+			"status":   healthStatus,
+			"messages": healthMessages,
+		},
+		"user_status": gin.H{
+			"active":    activeUsers,
+			"suspended": suspendedUsers,
+			"expired":   expiredUsers,
+		},
+		"auth_stats_24h":     legacyStats,
+		"auth_hourly_24h":    authStats24h,
+		"auth_daily_7d":      authStats7d,
+		"fail_trend_24h":     failTrend24h,
 		"traffic_hourly_24h": trafficStats24h,
-		"nas_stats_7d":      nasStats,
-		"top_users":         topUsers,
-		"recent_auths":      recentAuths,
-		"server_time":       time.Now().UTC(),
+		"nas_stats_7d":       nasStats,
+		"nas_health":         nasHealth,
+		"live_sessions":      liveSessions,
+		"top_users":          topUsers,
+		"recent_auths":       recentAuths,
+		"recent_alerts":      recentAlerts,
+		"recent_audit":       recentAudit,
+		"server_time":        time.Now().UTC(),
 	})
 }
 
