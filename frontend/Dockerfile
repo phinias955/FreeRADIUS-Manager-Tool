@@ -24,6 +24,6 @@ RUN rm -f /etc/nginx/conf.d/default.conf.bak
 EXPOSE 80
 
 HEALTHCHECK --interval=30s --timeout=5s \
-    CMD wget -qO- http://localhost/nginx-health || exit 1
+    CMD wget -qO- http://127.0.0.1/nginx-health || exit 1
 
 CMD ["nginx", "-g", "daemon off;"]

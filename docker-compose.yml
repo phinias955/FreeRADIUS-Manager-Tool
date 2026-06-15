@@ -95,7 +95,10 @@ services:
     restart: unless-stopped
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: /api/v1
     container_name: radius_frontend
     ports:
       - "8081:80"

@@ -24,6 +24,14 @@ $COMPOSE_CMD version >/dev/null 2>&1 || COMPOSE_CMD="docker compose"
 cd "$(dirname "$0")"
 info "Updating FreeRADIUS Manager in $(pwd)"
 
+# Load DB vars from .env safely (do not source — cron values break bash)
+if [ -f .env ]; then
+  DB_USER="${DB_USER:-$(grep -E '^DB_USER=' .env | cut -d= -f2- | tr -d '\r' || true)}"
+  DB_NAME="${DB_NAME:-$(grep -E '^DB_NAME=' .env | cut -d= -f2- | tr -d '\r' || true)}"
+fi
+DB_USER="${DB_USER:-radius_user}"
+DB_NAME="${DB_NAME:-radius}"
+
 # --- 1. Backup database ---
 BACKUP_DIR="./backups"
 mkdir -p "$BACKUP_DIR"
@@ -39,6 +47,7 @@ fi
 # --- 2. Pull latest code (keep local .env) ---
 info "Pulling latest code from origin/main ..."
 git fetch origin main
+git checkout main 2>/dev/null || true
 BEFORE=$(git rev-parse HEAD)
 git pull origin main
 AFTER=$(git rev-parse HEAD)
@@ -58,9 +67,9 @@ if [ -d migrations ] && docker ps --format '{{.Names}}' | grep -q '^radius_postg
   success "Migrations applied"
 fi
 
-# --- 4. Rebuild and restart ---
+# --- 4. Rebuild and restart (always rebuild — git pull alone is not enough) ---
 info "Rebuilding containers (this may take a few minutes) ..."
-$COMPOSE_CMD build backend frontend freeradius
+$COMPOSE_CMD build --no-cache backend frontend freeradius
 
 info "Restarting application containers ..."
 docker rm -f radius_backend radius_frontend radius_freeradius 2>/dev/null || true
@@ -68,7 +77,7 @@ $COMPOSE_CMD up -d postgres freeradius backend frontend
 
 # --- 5. Wait for health ---
 info "Waiting for services to start ..."
-sleep 8
+sleep 12
 
 if curl -sf http://localhost:8088/health >/dev/null 2>&1; then
   success "Backend health check passed (port 8088)"
@@ -82,6 +91,13 @@ else
   warn "Frontend not responding yet — check: docker logs radius_frontend"
 fi
 
+# Verify new backend code is running
+if docker exec radius_backend strings /app/radius-manager 2>/dev/null | grep -q 'RevokeSession'; then
+  success "Backend running updated session code"
+else
+  warn "Backend may still be on old code — rebuild may have failed"
+fi
+
 echo ""
 success "Update complete!"
 echo ""
@@ -89,5 +105,5 @@ echo "  Web UI:    http://$(hostname -I 2>/dev/null | awk '{print $1}'):8081"
 echo "  API:       http://$(hostname -I 2>/dev/null | awk '{print $1}'):8088"
 echo "  Version:   $(git log -1 --oneline)"
 echo ""
-warn "All users may need to log in again after this update (session changes)."
+warn "Hard-refresh your browser (Ctrl+Shift+R) after updating to load new JS."
 echo ""

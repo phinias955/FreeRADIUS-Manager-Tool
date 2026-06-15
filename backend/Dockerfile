@@ -27,9 +27,9 @@ COPY --from=builder /app/radius-manager .
 # nmap needs raw socket access for some scan types
 USER root
 
-EXPOSE 8080
+EXPOSE 8088
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-    CMD curl -f http://localhost:8080/health || exit 1
+    CMD curl -f http://127.0.0.1:8088/health || exit 1
 
 CMD ["./radius-manager"]
