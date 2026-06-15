@@ -98,8 +98,17 @@ func (h *Handler) Login(c *gin.Context) {
 		WHERE id = $1`, user.ID,
 	)
 
+	// Single-session policy: new login replaces any existing session (other devices are signed out).
+	auth.RevokeAllUserSessions(h.db.DB, user.ID)
+
+	sessionID, err := auth.GenerateSessionID()
+	if err != nil {
+		respondError(c, http.StatusInternalServerError, "failed to create session")
+		return
+	}
+
 	// Issue tokens
-	accessToken, err := auth.GenerateAccessToken(user.ID, user.Username, user.Role)
+	accessToken, err := auth.GenerateAccessToken(user.ID, user.Username, user.Role, sessionID)
 	if err != nil {
 		h.log.WithError(err).Error("failed to generate access token")
 		respondError(c, http.StatusInternalServerError, "failed to generate token")
@@ -115,8 +124,9 @@ func (h *Handler) Login(c *gin.Context) {
 
 	expiry := time.Now().Add(auth.RefreshExpiry())
 	h.db.Exec(`
-		INSERT INTO refresh_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3)`,
-		user.ID, refreshHash, expiry,
+		INSERT INTO refresh_tokens (user_id, token_hash, expires_at, session_id, client_ip, user_agent, last_activity)
+		VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
+		user.ID, refreshHash, expiry, sessionID, c.ClientIP(), c.GetHeader("User-Agent"),
 	)
 
 	user.PasswordHash = ""
@@ -125,7 +135,7 @@ func (h *Handler) Login(c *gin.Context) {
 	c.JSON(http.StatusOK, models.TokenResponse{
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
-		ExpiresIn:    int(15 * 60),
+		ExpiresIn:    int(auth.AccessExpiry().Seconds()),
 		User:         &user,
 	})
 }
@@ -141,9 +151,9 @@ func (h *Handler) RefreshToken(c *gin.Context) {
 	hash := auth.HashRefreshToken(req.RefreshToken)
 
 	var userID int
-	var role, username string
+	var role, username, sessionID string
 	err := h.db.QueryRow(`
-		SELECT rt.user_id, au.username, au.role
+		SELECT rt.user_id, au.username, au.role, rt.session_id
 		FROM refresh_tokens rt
 		JOIN app_users au ON au.id = rt.user_id
 		WHERE rt.token_hash = $1
@@ -151,7 +161,7 @@ func (h *Handler) RefreshToken(c *gin.Context) {
 		  AND rt.expires_at > NOW()
 		  AND au.is_active = TRUE`,
 		hash,
-	).Scan(&userID, &username, &role)
+	).Scan(&userID, &username, &role, &sessionID)
 
 	if err == sql.ErrNoRows {
 		respondError(c, http.StatusUnauthorized, "invalid or expired refresh token")
@@ -163,10 +173,10 @@ func (h *Handler) RefreshToken(c *gin.Context) {
 		return
 	}
 
-	// Rotate refresh token
+	// Rotate refresh token (same session)
 	h.db.Exec(`UPDATE refresh_tokens SET revoked = TRUE WHERE token_hash = $1`, hash)
 
-	newAccessToken, err := auth.GenerateAccessToken(userID, username, role)
+	newAccessToken, err := auth.GenerateAccessToken(userID, username, role, sessionID)
 	if err != nil {
 		respondError(c, http.StatusInternalServerError, "failed to generate token")
 		return
@@ -180,25 +190,93 @@ func (h *Handler) RefreshToken(c *gin.Context) {
 
 	expiry := time.Now().Add(auth.RefreshExpiry())
 	h.db.Exec(`
-		INSERT INTO refresh_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3)`,
-		userID, newHash, expiry,
+		INSERT INTO refresh_tokens (user_id, token_hash, expires_at, session_id, client_ip, user_agent, last_activity)
+		VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
+		userID, newHash, expiry, sessionID, c.ClientIP(), c.GetHeader("User-Agent"),
 	)
 
 	c.JSON(http.StatusOK, gin.H{
 		"access_token":  newAccessToken,
 		"refresh_token": newRefreshToken,
-		"expires_in":    15 * 60,
+		"expires_in":    int(auth.AccessExpiry().Seconds()),
 	})
 }
 
-// Logout revokes the refresh token.
+// Logout revokes all sessions for the current user.
 func (h *Handler) Logout(c *gin.Context) {
-	var req models.RefreshRequest
-	if err := c.ShouldBindJSON(&req); err == nil && req.RefreshToken != "" {
-		hash := auth.HashRefreshToken(req.RefreshToken)
-		h.db.Exec(`UPDATE refresh_tokens SET revoked = TRUE WHERE token_hash = $1`, hash)
-	}
+	claims, _ := middleware.GetClaims(c)
+	auth.RevokeAllUserSessions(h.db.DB, claims.UserID)
 	c.JSON(http.StatusOK, gin.H{"message": "logged out successfully"})
+}
+
+// GetProfile returns the authenticated user's profile.
+func (h *Handler) GetProfile(c *gin.Context) {
+	claims, _ := middleware.GetClaims(c)
+
+	var user models.AppUser
+	err := h.db.QueryRow(`
+		SELECT id, username, email, COALESCE(full_name, ''), role,
+		       mfa_enabled, is_active, last_login, created_at, updated_at
+		FROM app_users WHERE id = $1`,
+		claims.UserID,
+	).Scan(
+		&user.ID, &user.Username, &user.Email, &user.FullName, &user.Role,
+		&user.MFAEnabled, &user.IsActive, &user.LastLogin, &user.CreatedAt, &user.UpdatedAt,
+	)
+	if err == sql.ErrNoRows {
+		respondError(c, http.StatusNotFound, "user not found")
+		return
+	}
+	if err != nil {
+		h.log.WithError(err).Error("failed to fetch profile")
+		respondError(c, http.StatusInternalServerError, "failed to fetch profile")
+		return
+	}
+
+	c.JSON(http.StatusOK, user)
+}
+
+// UpdateProfile updates the authenticated user's email and full name.
+func (h *Handler) UpdateProfile(c *gin.Context) {
+	claims, _ := middleware.GetClaims(c)
+
+	var req models.UpdateProfileRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		respondError(c, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	_, err := h.db.Exec(`
+		UPDATE app_users
+		SET email = $1, full_name = $2, updated_at = NOW()
+		WHERE id = $3`,
+		req.Email, req.FullName, claims.UserID,
+	)
+	if err != nil {
+		if isUniqueViolation(err) {
+			respondError(c, http.StatusConflict, "email is already in use")
+			return
+		}
+		h.log.WithError(err).Error("failed to update profile")
+		respondError(c, http.StatusInternalServerError, "failed to update profile")
+		return
+	}
+
+	var user models.AppUser
+	h.db.QueryRow(`
+		SELECT id, username, email, COALESCE(full_name, ''), role,
+		       mfa_enabled, is_active, last_login, created_at, updated_at
+		FROM app_users WHERE id = $1`,
+		claims.UserID,
+	).Scan(
+		&user.ID, &user.Username, &user.Email, &user.FullName, &user.Role,
+		&user.MFAEnabled, &user.IsActive, &user.LastLogin, &user.CreatedAt, &user.UpdatedAt,
+	)
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "profile updated successfully",
+		"user":    user,
+	})
 }
 
 // ChangePassword changes the current user's password.

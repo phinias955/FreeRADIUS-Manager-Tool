@@ -152,10 +152,12 @@ func main() {
 		{
 			auth.POST("/login", h.Login)
 			auth.POST("/refresh", h.RefreshToken)
-			auth.POST("/logout", middleware.RequireAuth(), h.Logout)
-			auth.POST("/change-password", middleware.RequireAuth(), h.ChangePassword)
-			auth.POST("/mfa/setup", middleware.RequireAuth(), h.MFASetup)
-			auth.POST("/mfa/verify", middleware.RequireAuth(), h.MFAVerify)
+			auth.POST("/logout", middleware.RequireAuth(db), h.Logout)
+			auth.GET("/profile", middleware.RequireAuth(db), h.GetProfile)
+			auth.PUT("/profile", middleware.RequireAuth(db), h.UpdateProfile)
+			auth.POST("/change-password", middleware.RequireAuth(db), h.ChangePassword)
+			auth.POST("/mfa/setup", middleware.RequireAuth(db), h.MFASetup)
+			auth.POST("/mfa/verify", middleware.RequireAuth(db), h.MFAVerify)
 		}
 
 		// ── Tier 4 Pro: User Self-Service Portal (public, no JWT) ────────────
@@ -171,7 +173,7 @@ func main() {
 
 		// Protected routes
 		protected := v1.Group("/")
-		protected.Use(middleware.RequireAuth())
+		protected.Use(middleware.RequireAuth(db))
 		protected.Use(middleware.AuditLogger(db, log))
 
 		// Dashboard & Statistics

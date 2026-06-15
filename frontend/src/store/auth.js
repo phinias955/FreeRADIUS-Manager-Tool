@@ -57,6 +57,11 @@ export const useAuthStore = defineStore('auth', () => {
     return roles.includes(userRole.value)
   }
 
+  function setUser(updatedUser) {
+    user.value = updatedUser
+    localStorage.setItem('user', JSON.stringify(updatedUser))
+  }
+
   return {
     user,
     accessToken,
@@ -70,5 +75,6 @@ export const useAuthStore = defineStore('auth', () => {
     logout,
     clearAuth,
     hasRole,
+    setUser,
   }
 })

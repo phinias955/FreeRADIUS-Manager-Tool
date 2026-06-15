@@ -291,7 +291,7 @@ Copy `.env.example` to `.env` and set every value before first run.
 
 | Variable | Default | Description |
 |---|---|---|
-| `JWT_ACCESS_EXPIRY` | `15m` | Access token lifetime |
+| `JWT_ACCESS_EXPIRY` | `1h` | Access token lifetime (auto-logout after inactivity) |
 | `JWT_REFRESH_EXPIRY` | `168h` | Refresh token lifetime (7 days) |
 
 ### Email (SMTP)

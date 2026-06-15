@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/freeradius-manager/backend/internal/auth"
+	"github.com/freeradius-manager/backend/internal/database"
 	"github.com/gin-gonic/gin"
 )
 
@@ -12,8 +13,8 @@ const (
 	claimsKey = "claims"
 )
 
-// RequireAuth validates the Bearer JWT from the Authorization header or ?token= query param (for SSE).
-func RequireAuth() gin.HandlerFunc {
+// RequireAuth validates the Bearer JWT and ensures the session is still active (single login).
+func RequireAuth(db *database.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		header := c.GetHeader("Authorization")
 
@@ -46,6 +47,17 @@ func RequireAuth() gin.HandlerFunc {
 			return
 		}
 
+		active, err := auth.ValidateSession(db.DB, claims.UserID, claims.SessionID)
+		if err != nil || !active {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
+				"error": "session ended or account logged in elsewhere",
+				"code":  "SESSION_REVOKED",
+			})
+			return
+		}
+
+		auth.TouchSession(db.DB, claims.UserID, claims.SessionID)
+
 		c.Set(claimsKey, claims)
 		c.Next()
 	}
@@ -62,7 +74,7 @@ func RequireRole(roles ...string) gin.HandlerFunc {
 
 		if !auth.HasRole(claims.Role, roles...) {
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
-				"error": "insufficient permissions",
+				"error":          "insufficient permissions",
 				"required_roles": roles,
 			})
 			return

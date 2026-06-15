@@ -180,22 +180,32 @@
 
       <!-- User info -->
       <div class="border-t border-gray-200 p-4">
-        <div class="flex items-center gap-3">
+        <router-link
+          to="/profile"
+          class="flex items-center gap-3 rounded-lg p-1 -m-1 hover:bg-gray-50 transition-colors group"
+        >
           <div class="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
             <span class="text-blue-700 font-semibold text-sm">
               {{ userInitials }}
             </span>
           </div>
           <div class="flex-1 min-w-0">
-            <p class="text-sm font-medium text-gray-900 truncate">{{ authStore.user?.full_name || authStore.user?.username }}</p>
+            <p class="text-sm font-medium text-gray-900 truncate group-hover:text-blue-600">
+              {{ authStore.user?.full_name || authStore.user?.username }}
+            </p>
             <p class="text-xs text-gray-500 capitalize">{{ authStore.user?.role?.replace('_', ' ') }}</p>
           </div>
+        </router-link>
+        <div class="flex gap-2 mt-2">
+          <router-link to="/profile" class="flex-1 text-center text-xs py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 font-medium transition-colors">
+            My Profile
+          </router-link>
           <button
             @click="handleLogout"
-            class="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-            title="Sign out"
+            class="flex-1 text-xs py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 font-medium transition-colors flex items-center justify-center gap-1"
           >
-            <ArrowRightOnRectangleIcon class="w-4 h-4" />
+            <ArrowRightOnRectangleIcon class="w-3.5 h-3.5" />
+            Sign out
           </button>
         </div>
       </div>

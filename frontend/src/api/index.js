@@ -40,7 +40,16 @@ api.interceptors.response.use(
     const originalRequest = error.config
 
     if (error.response?.status === 401 && !originalRequest._retry) {
-      if (error.response?.data?.code === 'TOKEN_EXPIRED') {
+      const code = error.response?.data?.code
+
+      if (code === 'SESSION_REVOKED') {
+        const authStore = useAuthStore()
+        authStore.clearAuth()
+        router.push({ path: '/login', query: { reason: 'session_revoked' } })
+        return Promise.reject(error)
+      }
+
+      if (code === 'TOKEN_EXPIRED') {
         if (isRefreshing) {
           return new Promise((resolve, reject) => {
             failedQueue.push({ resolve, reject })
@@ -95,6 +104,8 @@ export const authAPI = {
   login: (data) => api.post('/auth/login', data),
   logout: (refreshToken) => api.post('/auth/logout', { refresh_token: refreshToken }),
   refresh: (refreshToken) => api.post('/auth/refresh', { refresh_token: refreshToken }),
+  getProfile: () => api.get('/auth/profile'),
+  updateProfile: (data) => api.put('/auth/profile', data),
   changePassword: (data) => api.post('/auth/change-password', data),
   setupMFA: () => api.post('/auth/mfa/setup'),
   verifyMFA: (code) => api.post('/auth/mfa/verify', { code }),

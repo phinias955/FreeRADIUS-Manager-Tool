@@ -14,9 +14,10 @@ import (
 
 // Claims contains JWT payload fields.
 type Claims struct {
-	UserID   int    `json:"user_id"`
-	Username string `json:"username"`
-	Role     string `json:"role"`
+	UserID    int    `json:"user_id"`
+	Username  string `json:"username"`
+	Role      string `json:"role"`
+	SessionID string `json:"session_id"`
 	jwt.RegisteredClaims
 }
 
@@ -27,14 +28,15 @@ var (
 )
 
 // GenerateAccessToken creates a short-lived JWT for API access.
-func GenerateAccessToken(userID int, username, role string) (string, error) {
+func GenerateAccessToken(userID int, username, role, sessionID string) (string, error) {
 	secret := getJWTSecret()
 	expiry := getAccessExpiry()
 
 	claims := Claims{
-		UserID:   userID,
-		Username: username,
-		Role:     role,
+		UserID:    userID,
+		Username:  username,
+		Role:      role,
+		SessionID: sessionID,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(expiry)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
@@ -111,17 +113,22 @@ func getJWTSecret() string {
 	return s
 }
 
+// AccessExpiry returns the access token duration.
+func AccessExpiry() time.Duration {
+	return getAccessExpiry()
+}
+
 func getAccessExpiry() time.Duration {
 	raw := os.Getenv("JWT_ACCESS_EXPIRY")
 	if raw == "" {
-		return 15 * time.Minute
+		return time.Hour
 	}
 	// Support both duration strings and plain minutes
 	d, err := time.ParseDuration(raw)
 	if err != nil {
 		mins, err2 := strconv.Atoi(raw)
 		if err2 != nil {
-			return 15 * time.Minute
+			return time.Hour
 		}
 		return time.Duration(mins) * time.Minute
 	}

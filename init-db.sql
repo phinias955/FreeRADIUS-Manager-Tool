@@ -211,12 +211,17 @@ CREATE TABLE IF NOT EXISTS refresh_tokens (
     id          SERIAL PRIMARY KEY,
     user_id     INTEGER NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
     token_hash  VARCHAR(255) NOT NULL UNIQUE,
+    session_id  VARCHAR(64) NOT NULL DEFAULT '',
     expires_at  TIMESTAMP NOT NULL,
     revoked     BOOLEAN DEFAULT FALSE,
+    client_ip   VARCHAR(45),
+    user_agent  TEXT,
+    last_activity TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS refresh_tokens_user ON refresh_tokens (user_id);
 CREATE INDEX IF NOT EXISTS refresh_tokens_hash ON refresh_tokens (token_hash);
+CREATE INDEX IF NOT EXISTS refresh_tokens_session ON refresh_tokens (user_id, session_id) WHERE revoked = FALSE;
 
 -- ============================================================
 -- TRIGGERS - auto-update updated_at

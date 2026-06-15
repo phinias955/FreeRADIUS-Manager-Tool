@@ -50,6 +50,12 @@ type ChangePasswordRequest struct {
 	NewPassword     string `json:"new_password" binding:"required,min=12"`
 }
 
+// UpdateProfileRequest is used for updating the current user's own profile.
+type UpdateProfileRequest struct {
+	Email    string `json:"email" binding:"required,email"`
+	FullName string `json:"full_name" binding:"required,min=2,max=100"`
+}
+
 // RefreshRequest carries the refresh token.
 type RefreshRequest struct {
 	RefreshToken string `json:"refresh_token" binding:"required"`
