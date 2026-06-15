@@ -11,9 +11,23 @@ import (
 
 // DashboardStats returns aggregated statistics for the dashboard.
 func (h *Handler) DashboardStats(c *gin.Context) {
-	type AuthStat struct {
-		Hour    string `json:"hour"`
-		Sessions int   `json:"sessions"`
+	type AuthHourStat struct {
+		Hour     string `json:"hour"`
+		Accepted int    `json:"accepted"`
+		Rejected int    `json:"rejected"`
+		Total    int    `json:"total"`
+	}
+
+	type AuthDayStat struct {
+		Day      string `json:"day"`
+		Accepted int    `json:"accepted"`
+		Rejected int    `json:"rejected"`
+		Total    int    `json:"total"`
+	}
+
+	type TrafficHourStat struct {
+		Hour  string `json:"hour"`
+		Bytes int64  `json:"bytes"`
 	}
 
 	type TopUser struct {
@@ -22,48 +36,153 @@ func (h *Handler) DashboardStats(c *gin.Context) {
 		Bytes    int64  `json:"bytes_total"`
 	}
 
+	type NASStat struct {
+		NASIP string `json:"nas_ip"`
+		Auths int    `json:"auths"`
+	}
+
+	type RecentAuth struct {
+		ID        int64      `json:"id"`
+		Username  string     `json:"username"`
+		NASIPAddr *string    `json:"nas_ip"`
+		Calling   *string    `json:"calling_station"`
+		AuthTime  time.Time  `json:"auth_time"`
+		Reply     string     `json:"reply"`
+		Accepted  bool       `json:"accepted"`
+	}
+
 	var activeSessions int
 	h.db.QueryRow(`SELECT COUNT(*) FROM radacct WHERE acctstoptime IS NULL`).Scan(&activeSessions)
 
-	var totalUsers int
+	var totalUsers, activeUsers, suspendedUsers, totalNAS int
 	h.db.QueryRow(`SELECT COUNT(*) FROM radius_users`).Scan(&totalUsers)
-
-	var activeUsers int
 	h.db.QueryRow(`SELECT COUNT(*) FROM radius_users WHERE status = 'active'`).Scan(&activeUsers)
-
-	var suspendedUsers int
 	h.db.QueryRow(`SELECT COUNT(*) FROM radius_users WHERE status = 'suspended'`).Scan(&suspendedUsers)
-
-	var totalNAS int
 	h.db.QueryRow(`SELECT COUNT(*) FROM nas WHERE status = 'active'`).Scan(&totalNAS)
 
-	var todayAuths int
-	h.db.QueryRow(`SELECT COUNT(*) FROM radacct WHERE acctstarttime >= CURRENT_DATE`).Scan(&todayAuths)
+	var todayAccepts, todayRejects int
+	h.db.QueryRow(`
+		SELECT
+			COALESCE(SUM(CASE WHEN reply IN ('Access-Accept', '2') THEN 1 ELSE 0 END), 0),
+			COALESCE(SUM(CASE WHEN reply IN ('Access-Reject', 'Reject') OR reply NOT IN ('Access-Accept', '2', '') THEN 1 ELSE 0 END), 0)
+		FROM radpostauth WHERE authdate >= CURRENT_DATE`).Scan(&todayAccepts, &todayRejects)
 
-	authRows, _ := h.db.Query(`
-		SELECT date_trunc('hour', acctstarttime) as hour, COUNT(*) as total
-		FROM radacct
-		WHERE acctstarttime >= NOW() - INTERVAL '24 hours'
-		GROUP BY hour
-		ORDER BY hour`)
+	todayAuths := todayAccepts + todayRejects
+	authSuccessRate := 0.0
+	if todayAuths > 0 {
+		authSuccessRate = float64(todayAccepts) / float64(todayAuths) * 100
+	}
 
-	authStats := []AuthStat{}
-	if authRows != nil {
-		defer authRows.Close()
-		for authRows.Next() {
-			var s AuthStat
+	var trafficToday, traffic7d int64
+	h.db.QueryRow(`
+		SELECT COALESCE(SUM(acctinputoctets + acctoutputoctets), 0)
+		FROM radacct WHERE acctstarttime >= CURRENT_DATE`).Scan(&trafficToday)
+	h.db.QueryRow(`
+		SELECT COALESCE(SUM(acctinputoctets + acctoutputoctets), 0)
+		FROM radacct WHERE acctstarttime >= NOW() - INTERVAL '7 days'`).Scan(&traffic7d)
+
+	// Hourly auth accept/reject for last 24h (zero-filled)
+	authHourRows, _ := h.db.Query(`
+		SELECT h.hour,
+		       COALESCE(a.accepted, 0),
+		       COALESCE(a.rejected, 0)
+		FROM generate_series(
+			date_trunc('hour', NOW() - INTERVAL '23 hours'),
+			date_trunc('hour', NOW()),
+			INTERVAL '1 hour'
+		) AS h(hour)
+		LEFT JOIN (
+			SELECT date_trunc('hour', authdate) AS hour,
+			       SUM(CASE WHEN reply IN ('Access-Accept', '2') THEN 1 ELSE 0 END) AS accepted,
+			       SUM(CASE WHEN reply IN ('Access-Reject', 'Reject') OR (reply NOT IN ('Access-Accept', '2', '') AND reply <> '') THEN 1 ELSE 0 END) AS rejected
+			FROM radpostauth
+			WHERE authdate >= NOW() - INTERVAL '24 hours'
+			GROUP BY 1
+		) a ON a.hour = h.hour
+		ORDER BY h.hour`)
+
+	authStats24h := []AuthHourStat{}
+	if authHourRows != nil {
+		defer authHourRows.Close()
+		for authHourRows.Next() {
+			var s AuthHourStat
 			var hour time.Time
-			authRows.Scan(&hour, &s.Sessions)
+			authHourRows.Scan(&hour, &s.Accepted, &s.Rejected)
 			s.Hour = hour.Format("2006-01-02 15:04")
-			authStats = append(authStats, s)
+			s.Total = s.Accepted + s.Rejected
+			authStats24h = append(authStats24h, s)
 		}
 	}
 
+	// Daily auth trend for last 7 days (zero-filled)
+	authDayRows, _ := h.db.Query(`
+		SELECT d.day::date,
+		       COALESCE(a.accepted, 0),
+		       COALESCE(a.rejected, 0)
+		FROM generate_series(
+			(CURRENT_DATE - INTERVAL '6 days')::date,
+			CURRENT_DATE,
+			INTERVAL '1 day'
+		) AS d(day)
+		LEFT JOIN (
+			SELECT DATE(authdate) AS day,
+			       SUM(CASE WHEN reply IN ('Access-Accept', '2') THEN 1 ELSE 0 END) AS accepted,
+			       SUM(CASE WHEN reply IN ('Access-Reject', 'Reject') OR (reply NOT IN ('Access-Accept', '2', '') AND reply <> '') THEN 1 ELSE 0 END) AS rejected
+			FROM radpostauth
+			WHERE authdate >= CURRENT_DATE - INTERVAL '6 days'
+			GROUP BY 1
+		) a ON a.day = d.day::date
+		ORDER BY d.day`)
+
+	authStats7d := []AuthDayStat{}
+	if authDayRows != nil {
+		defer authDayRows.Close()
+		for authDayRows.Next() {
+			var s AuthDayStat
+			var day time.Time
+			authDayRows.Scan(&day, &s.Accepted, &s.Rejected)
+			s.Day = day.Format("2006-01-02")
+			s.Total = s.Accepted + s.Rejected
+			authStats7d = append(authStats7d, s)
+		}
+	}
+
+	// Hourly traffic for last 24h (zero-filled)
+	trafficRows, _ := h.db.Query(`
+		SELECT h.hour,
+		       COALESCE(t.bytes, 0)
+		FROM generate_series(
+			date_trunc('hour', NOW() - INTERVAL '23 hours'),
+			date_trunc('hour', NOW()),
+			INTERVAL '1 hour'
+		) AS h(hour)
+		LEFT JOIN (
+			SELECT date_trunc('hour', acctstarttime) AS hour,
+			       SUM(acctinputoctets + acctoutputoctets) AS bytes
+			FROM radacct
+			WHERE acctstarttime >= NOW() - INTERVAL '24 hours'
+			GROUP BY 1
+		) t ON t.hour = h.hour
+		ORDER BY h.hour`)
+
+	trafficStats24h := []TrafficHourStat{}
+	if trafficRows != nil {
+		defer trafficRows.Close()
+		for trafficRows.Next() {
+			var s TrafficHourStat
+			var hour time.Time
+			trafficRows.Scan(&hour, &s.Bytes)
+			s.Hour = hour.Format("2006-01-02 15:04")
+			trafficStats24h = append(trafficStats24h, s)
+		}
+	}
+
+	// Top users by successful auths (7d), fallback to session bytes from radacct
 	topRows, _ := h.db.Query(`
-		SELECT username, COUNT(*) as sessions,
-		       COALESCE(SUM(acctinputoctets + acctoutputoctets), 0) as bytes
-		FROM radacct
-		WHERE acctstarttime >= NOW() - INTERVAL '7 days'
+		SELECT username, COUNT(*) AS sessions, 0 AS bytes
+		FROM radpostauth
+		WHERE authdate >= NOW() - INTERVAL '7 days'
+		  AND reply IN ('Access-Accept', '2')
 		GROUP BY username
 		ORDER BY sessions DESC
 		LIMIT 10`)
@@ -77,47 +196,95 @@ func (h *Handler) DashboardStats(c *gin.Context) {
 			topUsers = append(topUsers, u)
 		}
 	}
+	if len(topUsers) == 0 {
+		fallbackRows, _ := h.db.Query(`
+			SELECT username, COUNT(*) AS sessions,
+			       COALESCE(SUM(acctinputoctets + acctoutputoctets), 0) AS bytes
+			FROM radacct
+			WHERE acctstarttime >= NOW() - INTERVAL '7 days'
+			GROUP BY username
+			ORDER BY sessions DESC
+			LIMIT 10`)
+		if fallbackRows != nil {
+			defer fallbackRows.Close()
+			for fallbackRows.Next() {
+				var u TopUser
+				fallbackRows.Scan(&u.Username, &u.Sessions, &u.Bytes)
+				topUsers = append(topUsers, u)
+			}
+		}
+	}
 
-	type RecentAuth struct {
-		Username    string     `json:"username"`
-		NASIPAddr   string     `json:"nas_ip"`
-		FramedIP    *string    `json:"framed_ip"`
-		StartTime   *time.Time `json:"start_time"`
-		SessionTime int64      `json:"session_time"`
-		Active      bool       `json:"active"`
+	// NAS activity from post-auth (7d)
+	nasRows, _ := h.db.Query(`
+		SELECT COALESCE(nasipaddress::text, 'Unknown'), COUNT(*)
+		FROM radpostauth
+		WHERE authdate >= NOW() - INTERVAL '7 days'
+		GROUP BY nasipaddress
+		ORDER BY COUNT(*) DESC
+		LIMIT 8`)
+
+	nasStats := []NASStat{}
+	if nasRows != nil {
+		defer nasRows.Close()
+		for nasRows.Next() {
+			var n NASStat
+			nasRows.Scan(&n.NASIP, &n.Auths)
+			nasStats = append(nasStats, n)
+		}
 	}
 
 	recentRows, _ := h.db.Query(`
-		SELECT username, nasipaddress::text, framedipaddress::text,
-		       acctstarttime, acctsessiontime, (acctstoptime IS NULL) as active
-		FROM radacct
-		ORDER BY acctstarttime DESC
-		LIMIT 20`)
+		SELECT id, username, nasipaddress::text, callingstationid, authdate, reply
+		FROM radpostauth
+		ORDER BY authdate DESC
+		LIMIT 15`)
 
 	recentAuths := []RecentAuth{}
 	if recentRows != nil {
 		defer recentRows.Close()
 		for recentRows.Next() {
 			var r RecentAuth
-			recentRows.Scan(&r.Username, &r.NASIPAddr, &r.FramedIP,
-				&r.StartTime, &r.SessionTime, &r.Active)
+			var reply string
+			recentRows.Scan(&r.ID, &r.Username, &r.NASIPAddr, &r.Calling, &r.AuthTime, &reply)
+			r.Reply = reply
+			r.Accepted = reply == "Access-Accept" || reply == "2"
 			recentAuths = append(recentAuths, r)
 		}
 	}
 
+	// Legacy field: sessions per hour from radacct (kept for compatibility)
+	type LegacyAuthStat struct {
+		Hour     string `json:"hour"`
+		Sessions int    `json:"sessions"`
+	}
+	legacyStats := make([]LegacyAuthStat, len(authStats24h))
+	for i, s := range authStats24h {
+		legacyStats[i] = LegacyAuthStat{Hour: s.Hour, Sessions: s.Total}
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"summary": gin.H{
-			"active_sessions": activeSessions,
-			"total_users":     totalUsers,
-			"active_users":    activeUsers,
-			"suspended_users": suspendedUsers,
-			"total_nas":       totalNAS,
-			"today_auths":     todayAuths,
+			"active_sessions":   activeSessions,
+			"total_users":       totalUsers,
+			"active_users":      activeUsers,
+			"suspended_users":   suspendedUsers,
+			"total_nas":         totalNAS,
+			"today_auths":       todayAuths,
+			"today_accepts":     todayAccepts,
+			"today_rejects":     todayRejects,
+			"auth_success_rate": authSuccessRate,
+			"traffic_today":     trafficToday,
+			"traffic_7d":        traffic7d,
 		},
-		"auth_stats_24h": authStats,
-		"top_users":      topUsers,
-		"recent_auths":   recentAuths,
-		"server_time":    time.Now().UTC(),
+		"auth_stats_24h":    legacyStats,
+		"auth_hourly_24h":   authStats24h,
+		"auth_daily_7d":     authStats7d,
+		"traffic_hourly_24h": trafficStats24h,
+		"nas_stats_7d":      nasStats,
+		"top_users":         topUsers,
+		"recent_auths":      recentAuths,
+		"server_time":       time.Now().UTC(),
 	})
 }
 

@@ -1,23 +1,28 @@
 <template>
-  <div class="stat-card">
-    <div class="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0" :class="iconBg">
-      <component :is="iconComponent" class="w-6 h-6" :class="iconColor" />
+  <div class="stat-card !p-4">
+    <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" :class="iconBg">
+      <component :is="iconComponent" class="w-5 h-5" :class="iconColor" />
     </div>
-    <div>
-      <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">{{ title }}</p>
-      <div v-if="loading" class="h-7 w-16 bg-gray-200 rounded animate-pulse mt-1"></div>
-      <p v-else class="text-2xl font-bold text-gray-900">{{ value }}</p>
+    <div class="min-w-0">
+      <p class="text-[10px] font-medium text-gray-500 uppercase tracking-wide truncate">{{ title }}</p>
+      <div v-if="loading" class="h-6 w-12 bg-gray-200 rounded animate-pulse mt-1"></div>
+      <p v-else class="text-xl font-bold text-gray-900 truncate">{{ value }}</p>
+      <p v-if="subtitle && !loading" class="text-[10px] text-gray-400 mt-0.5 truncate">{{ subtitle }}</p>
     </div>
   </div>
 </template>
 
 <script setup>
 import { computed } from 'vue'
-import { SignalIcon, UsersIcon, UserIcon, ServerIcon, ShieldCheckIcon } from '@heroicons/vue/24/outline'
+import {
+  SignalIcon, UsersIcon, ServerIcon, ShieldCheckIcon,
+  CheckCircleIcon, XCircleIcon, BoltIcon, ChartBarIcon,
+} from '@heroicons/vue/24/outline'
 
 const props = defineProps({
   title: String,
   value: [String, Number],
+  subtitle: String,
   icon: String,
   color: { type: String, default: 'blue' },
   loading: Boolean,
@@ -29,6 +34,9 @@ const colorMap = {
   green: { bg: 'bg-green-100', icon: 'text-green-600' },
   orange: { bg: 'bg-orange-100', icon: 'text-orange-600' },
   red: { bg: 'bg-red-100', icon: 'text-red-600' },
+  indigo: { bg: 'bg-indigo-100', icon: 'text-indigo-600' },
+  teal: { bg: 'bg-teal-100', icon: 'text-teal-600' },
+  cyan: { bg: 'bg-cyan-100', icon: 'text-cyan-600' },
 }
 
 const iconMap = {
@@ -36,10 +44,13 @@ const iconMap = {
   users: UsersIcon,
   'user-check': ShieldCheckIcon,
   server: ServerIcon,
-  user: UserIcon,
+  check: CheckCircleIcon,
+  x: XCircleIcon,
+  bolt: BoltIcon,
+  chart: ChartBarIcon,
 }
 
 const iconBg = computed(() => colorMap[props.color]?.bg || 'bg-gray-100')
 const iconColor = computed(() => colorMap[props.color]?.icon || 'text-gray-600')
-const iconComponent = computed(() => iconMap[props.icon] || UserIcon)
+const iconComponent = computed(() => iconMap[props.icon] || UsersIcon)
 </script>
