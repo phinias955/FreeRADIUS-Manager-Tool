@@ -18,14 +18,14 @@ RUN go mod tidy && \
 # ---- Runtime Stage ----
 FROM alpine:3.19
 
-RUN apk add --no-cache ca-certificates tzdata curl
+RUN apk add --no-cache ca-certificates tzdata curl nmap nmap-scripts
 
 WORKDIR /app
 
 COPY --from=builder /app/radius-manager .
 
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
-USER appuser
+# nmap needs raw socket access for some scan types
+USER root
 
 EXPOSE 8080
 

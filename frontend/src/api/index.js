@@ -157,6 +157,16 @@ export const nasAPI = {
   discover: (data) => api.post('/nas/discover', data),
 }
 
+// --- Network Scanner (nmap) ---
+export const networkScannerAPI = {
+  status: () => api.get('/network/scanner/status'),
+  startScan: (data) => api.post('/network/scan', data),
+  listScans: (params) => api.get('/network/scans', { params }),
+  getScan: (id) => api.get(`/network/scans/${id}`),
+  deleteScan: (id) => api.delete(`/network/scans/${id}`),
+  importAsNAS: (hostId) => api.post(`/network/scans/hosts/${hostId}/import-nas`),
+}
+
 // --- RADIUS Test ---
 export const radiusAPI = {
   test: (data) => api.post('/radius/test', data),

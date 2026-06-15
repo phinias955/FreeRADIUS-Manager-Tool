@@ -79,6 +79,14 @@
   .badge-gray {
     @apply badge bg-gray-100 text-gray-800;
   }
+
+  .badge-purple {
+    @apply badge bg-purple-100 text-purple-800;
+  }
+
+  .badge-orange {
+    @apply badge bg-orange-100 text-orange-800;
+  }
   
   .table-container {
     @apply overflow-x-auto rounded-lg border border-gray-200;

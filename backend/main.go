@@ -224,6 +224,17 @@ func main() {
 			nas.POST("/discover", middleware.RequireRole("admin", "super_admin"), h.DiscoverNAS)
 		}
 
+		// Network scanner (nmap)
+		network := protected.Group("network")
+		{
+			network.GET("/scanner/status", middleware.RequireRole("admin", "super_admin"), h.NetworkScannerStatus)
+			network.POST("/scan", middleware.RequireRole("admin", "super_admin"), h.StartNetworkScan)
+			network.GET("/scans", middleware.RequireRole("admin", "super_admin"), h.ListNetworkScans)
+			network.GET("/scans/:id", middleware.RequireRole("admin", "super_admin"), h.GetNetworkScan)
+			network.DELETE("/scans/:id", middleware.RequireRole("admin", "super_admin"), h.DeleteNetworkScan)
+			network.POST("/scans/hosts/:hostId/import-nas", middleware.RequireRole("admin", "super_admin"), h.ImportScanHostAsNAS)
+		}
+
 		// RADIUS test endpoint
 		protected.POST("radius/test", middleware.RequireRole("admin", "super_admin"), h.TestRADIUS)
 

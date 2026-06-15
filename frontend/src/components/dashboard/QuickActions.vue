@@ -1,5 +1,5 @@
 <template>
-  <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+  <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-2">
     <router-link
       v-for="action in actions"
       :key="action.to"
@@ -18,7 +18,7 @@
 <script setup>
 import {
   BeakerIcon, UserPlusIcon, SignalIcon, ShieldCheckIcon,
-  ServerIcon, TicketIcon,
+  ServerIcon, TicketIcon, MagnifyingGlassCircleIcon,
 } from '@heroicons/vue/24/outline'
 
 const actions = [
@@ -27,6 +27,7 @@ const actions = [
   { to: '/monitor', label: 'Monitor', icon: SignalIcon, bg: 'bg-blue-100', color: 'text-blue-600' },
   { to: '/security', label: 'Security', icon: ShieldCheckIcon, bg: 'bg-red-100', color: 'text-red-600' },
   { to: '/nas', label: 'NAS Devices', icon: ServerIcon, bg: 'bg-orange-100', color: 'text-orange-600' },
+  { to: '/network-scanner', label: 'Scan Network', icon: MagnifyingGlassCircleIcon, bg: 'bg-cyan-100', color: 'text-cyan-600' },
   { to: '/vouchers', label: 'Vouchers', icon: TicketIcon, bg: 'bg-teal-100', color: 'text-teal-600' },
 ]
 </script>

@@ -87,6 +87,9 @@ services:
         condition: service_started
     networks:
       - radius-network
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
     restart: unless-stopped
 
   frontend:

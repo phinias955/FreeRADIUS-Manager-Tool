@@ -147,6 +147,12 @@ const routes = [
         meta: { title: 'Network Map', roles: ['operator', 'admin', 'super_admin'] },
       },
       {
+        path: 'network-scanner',
+        name: 'NetworkScanner',
+        component: () => import('@/views/NetworkScanner.vue'),
+        meta: { title: 'Network Scanner', roles: ['admin', 'super_admin'] },
+      },
+      {
         path: 'sms',
         name: 'SMS',
         component: () => import('@/views/SMS.vue'),

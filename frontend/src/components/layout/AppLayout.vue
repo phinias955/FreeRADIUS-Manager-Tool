@@ -97,6 +97,10 @@
             <GlobeAltIcon class="w-5 h-5 flex-shrink-0" />
             Network Map
           </router-link>
+          <router-link to="/network-scanner" class="sidebar-link" active-class="active">
+            <MagnifyingGlassCircleIcon class="w-5 h-5 flex-shrink-0" />
+            Network Scanner
+          </router-link>
         </template>
 
         <!-- CRM -->
@@ -287,6 +291,7 @@ import {
   ShieldExclamationIcon,
   BugAntIcon,
   BeakerIcon,
+  MagnifyingGlassCircleIcon,
 } from '@heroicons/vue/24/outline'
 
 const authStore = useAuthStore()
