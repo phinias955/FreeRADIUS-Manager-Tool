@@ -222,21 +222,20 @@ func (h *Handler) UserSessions(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": sessions, "total": total, "username": username})
 }
 
-// AuthLogs returns recent RADIUS accounting/auth log entries.
+// AuthLogs returns recent RADIUS authentication attempts from radpostauth.
 func (h *Handler) AuthLogs(c *gin.Context) {
 	offset, limit := paginationParams(c)
 	username := c.Query("username")
 
 	type LogEntry struct {
-		SessionID string     `json:"session_id"`
+		ID        int64      `json:"id"`
 		Username  string     `json:"username"`
-		NASIPAddr string     `json:"nas_ip"`
-		Calling   string     `json:"calling_station"`
-		StartTime *time.Time `json:"start_time"`
-		StopTime  *time.Time `json:"stop_time"`
-		Duration  int64      `json:"duration"`
-		TermCause string     `json:"term_cause"`
-		Active    bool       `json:"active"`
+		NASIPAddr *string    `json:"nas_ip"`
+		Calling   *string    `json:"calling_station"`
+		Called    *string    `json:"called_station"`
+		AuthTime  time.Time  `json:"auth_time"`
+		Reply     string     `json:"reply"`
+		Accepted  bool       `json:"accepted"`
 	}
 
 	var rows *sql.Rows
@@ -244,20 +243,18 @@ func (h *Handler) AuthLogs(c *gin.Context) {
 
 	if username != "" {
 		rows, err = h.db.Query(`
-			SELECT acctsessionid, username, nasipaddress::text, callingstationid,
-			       acctstarttime, acctstoptime, acctsessiontime, acctterminatecause,
-			       (acctstoptime IS NULL) as active
-			FROM radacct
+			SELECT id, username, nasipaddress::text, callingstationid, calledstationid,
+			       authdate, reply
+			FROM radpostauth
 			WHERE username ILIKE $1
-			ORDER BY acctstarttime DESC
+			ORDER BY authdate DESC
 			LIMIT $2 OFFSET $3`, "%"+username+"%", limit, offset)
 	} else {
 		rows, err = h.db.Query(`
-			SELECT acctsessionid, username, nasipaddress::text, callingstationid,
-			       acctstarttime, acctstoptime, acctsessiontime, acctterminatecause,
-			       (acctstoptime IS NULL) as active
-			FROM radacct
-			ORDER BY acctstarttime DESC
+			SELECT id, username, nasipaddress::text, callingstationid, calledstationid,
+			       authdate, reply
+			FROM radpostauth
+			ORDER BY authdate DESC
 			LIMIT $1 OFFSET $2`, limit, offset)
 	}
 
@@ -270,12 +267,21 @@ func (h *Handler) AuthLogs(c *gin.Context) {
 	logs := []LogEntry{}
 	for rows.Next() {
 		var l LogEntry
-		rows.Scan(&l.SessionID, &l.Username, &l.NASIPAddr, &l.Calling,
-			&l.StartTime, &l.StopTime, &l.Duration, &l.TermCause, &l.Active)
+		var reply string
+		rows.Scan(&l.ID, &l.Username, &l.NASIPAddr, &l.Calling, &l.Called, &l.AuthTime, &reply)
+		l.Reply = reply
+		l.Accepted = reply == "Access-Accept" || reply == "2"
 		logs = append(logs, l)
 	}
 
-	c.JSON(http.StatusOK, gin.H{"data": logs})
+	var total int
+	if username != "" {
+		h.db.QueryRow(`SELECT COUNT(*) FROM radpostauth WHERE username ILIKE $1`, "%"+username+"%").Scan(&total)
+	} else {
+		h.db.QueryRow(`SELECT COUNT(*) FROM radpostauth`).Scan(&total)
+	}
+
+	c.JSON(http.StatusOK, gin.H{"data": logs, "total": total})
 }
 
 // AuditLogs returns admin audit log entries.

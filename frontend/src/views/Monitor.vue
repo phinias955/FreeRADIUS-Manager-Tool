@@ -36,6 +36,7 @@
 
     <!-- Active Sessions tab -->
     <div v-if="activeTab === 'sessions'">
+      <p v-if="loadError" class="text-sm text-red-600 mb-3">{{ loadError }}</p>
       <div class="card p-0 overflow-hidden">
         <div class="flex items-center justify-between px-4 py-3 border-b border-gray-200">
           <p class="text-sm font-medium text-gray-700">{{ sessions.total || 0 }} active sessions</p>
@@ -61,7 +62,10 @@
             </thead>
             <tbody>
               <tr v-if="!sessions.data?.length">
-                <td colspan="9" class="text-center text-gray-400 py-12">No active sessions</td>
+                <td colspan="9" class="text-center text-gray-400 py-12">
+                  <p>No active sessions</p>
+                  <p class="text-xs mt-2 max-w-md mx-auto">Sessions appear when your NAS sends RADIUS accounting (port 1813). Authentication-only tests do not create sessions.</p>
+                </td>
               </tr>
               <tr v-for="s in sessions.data" :key="s.session_id">
                 <td class="font-medium text-gray-900">{{ s.username }}</td>
@@ -101,6 +105,9 @@
       </div>
 
       <div class="card p-0 overflow-hidden">
+        <div class="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+          <p class="text-sm font-medium text-gray-700">{{ authLogs.total || 0 }} authentication attempts</p>
+        </div>
         <div class="table-container rounded-none border-0">
           <table class="table">
             <thead>
@@ -108,28 +115,27 @@
                 <th>Username</th>
                 <th>NAS IP</th>
                 <th>Device</th>
-                <th>Started</th>
-                <th>Stopped</th>
-                <th>Duration</th>
-                <th>Term Cause</th>
-                <th>Status</th>
+                <th>Called Station</th>
+                <th>Time</th>
+                <th>Result</th>
               </tr>
             </thead>
             <tbody>
               <tr v-if="!authLogs.data?.length">
-                <td colspan="8" class="text-center text-gray-400 py-12">No auth logs found</td>
+                <td colspan="6" class="text-center text-gray-400 py-12">
+                  <p>No auth logs found</p>
+                  <p class="text-xs mt-2 max-w-md mx-auto">Logs are recorded when users authenticate via RADIUS. Run a test from Security → RADIUS Simulator.</p>
+                </td>
               </tr>
-              <tr v-for="l in authLogs.data" :key="l.session_id">
+              <tr v-for="l in authLogs.data" :key="l.id">
                 <td class="font-medium">{{ l.username }}</td>
-                <td class="font-mono text-xs text-gray-500">{{ l.nas_ip }}</td>
+                <td class="font-mono text-xs text-gray-500">{{ l.nas_ip || '—' }}</td>
                 <td class="font-mono text-xs text-gray-500">{{ formatMAC(l.calling_station) }}</td>
-                <td class="text-xs text-gray-500">{{ formatDate(l.start_time) }}</td>
-                <td class="text-xs text-gray-500">{{ l.stop_time ? formatDate(l.stop_time) : '—' }}</td>
-                <td class="text-gray-500">{{ formatDuration(l.duration) }}</td>
-                <td class="text-xs text-gray-400">{{ l.term_cause || '—' }}</td>
+                <td class="font-mono text-xs text-gray-400">{{ l.called_station || '—' }}</td>
+                <td class="text-xs text-gray-500">{{ formatDate(l.auth_time) }}</td>
                 <td>
-                  <span :class="l.active ? 'badge-green' : 'badge-gray'" class="badge">
-                    {{ l.active ? 'Active' : 'Ended' }}
+                  <span :class="l.accepted ? 'badge-green' : 'badge-red'" class="badge">
+                    {{ l.accepted ? 'Accept' : 'Reject' }}
                   </span>
                 </td>
               </tr>
@@ -185,16 +191,17 @@ import { useToast } from 'vue-toastification'
 
 const toast = useToast()
 const loading = ref(false)
+const loadError = ref('')
 const activeTab = ref('sessions')
 const sessions = ref({ data: [], total: 0 })
-const authLogs = ref({ data: [] })
+const authLogs = ref({ data: [], total: 0 })
 const auditLogs = ref({ data: [], total: 0 })
 const logSearch = ref('')
 let refreshTimer, searchTimer
 
 const tabs = computed(() => [
   { id: 'sessions', label: 'Active Sessions', count: sessions.value.total },
-  { id: 'logs', label: 'Auth Logs' },
+  { id: 'logs', label: 'Auth Logs', count: authLogs.value.total },
   { id: 'audit', label: 'Audit Log' },
 ])
 
@@ -202,14 +209,18 @@ async function loadSessions() {
   try {
     const { data } = await dashboardAPI.getActiveSessions({ limit: 50 })
     sessions.value = data
-  } catch { /* silent */ }
+  } catch (err) {
+    loadError.value = err.response?.data?.error || 'Failed to load active sessions'
+  }
 }
 
 async function loadLogs() {
   try {
     const { data } = await dashboardAPI.getAuthLogs({ username: logSearch.value, limit: 50 })
     authLogs.value = data
-  } catch { /* silent */ }
+  } catch (err) {
+    toast.error(err.response?.data?.error || 'Failed to load auth logs')
+  }
 }
 
 async function loadAuditLogs() {
