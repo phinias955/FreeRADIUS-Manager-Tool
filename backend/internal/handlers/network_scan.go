@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"strconv"
@@ -71,7 +72,7 @@ func (h *Handler) StartNetworkScan(c *gin.Context) {
 }
 
 func (h *Handler) executeNetworkScan(scanID int, subnet, scanType string) {
-	ctx, cancel := context.WithTimeout(context.Background(), scanner.ScanTimeout(scanType))
+	ctx, cancel := context.WithTimeout(context.Background(), scanner.ScanTimeout(subnet, scanType))
 	defer cancel()
 
 	hosts, err := scanner.RunScan(ctx, subnet, scanType)
@@ -243,9 +244,13 @@ func (h *Handler) DeleteNetworkScan(c *gin.Context) {
 
 // NetworkScannerStatus returns whether nmap is available.
 func (h *Handler) NetworkScannerStatus(c *gin.Context) {
+	maxPrefix := scanner.MaxAllowedPrefix()
 	c.JSON(http.StatusOK, gin.H{
-		"nmap_available": scanner.NmapAvailable(),
-		"max_subnet":     "/24",
+		"nmap_available":        scanner.NmapAvailable(),
+		"max_subnet":            fmt.Sprintf("/%d", maxPrefix),
+		"max_hosts":             1 << (32 - maxPrefix),
+		"large_subnet_threshold": 256,
+		"two_phase_note":        "Subnets larger than /24 use discovery first, then port-scan live hosts only (max 512)",
 		"scan_types": []gin.H{
 			{"id": "ping", "label": "Ping Scan", "description": "Fast host discovery (ICMP/ARP)"},
 			{"id": "discovery", "label": "Discovery", "description": "Host discovery with common port probes"},

@@ -5,11 +5,18 @@ import (
 	"encoding/xml"
 	"fmt"
 	"net"
+	"os"
 	"os/exec"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
+)
+
+const (
+	defaultMaxPrefix        = 18
+	defaultMaxPortScanHosts = 512
+	largeSubnetThreshold    = 256
 )
 
 // HostResult is one discovered network device from nmap.
@@ -27,7 +34,26 @@ type HostResult struct {
 	Status     string
 }
 
-// ValidateSubnet ensures CIDR is valid and not too large (max /24).
+// MaxAllowedPrefix returns the smallest prefix length allowed (e.g. 18 = up to /18).
+func MaxAllowedPrefix() int {
+	if v := os.Getenv("NMAP_MAX_PREFIX"); v != "" {
+		if p, err := strconv.Atoi(v); err == nil && p >= 8 && p <= 24 {
+			return p
+		}
+	}
+	return defaultMaxPrefix
+}
+
+// SubnetHostCount returns the number of addresses in a CIDR block.
+func SubnetHostCount(ipNet *net.IPNet) int {
+	ones, bits := ipNet.Mask.Size()
+	if bits-ones >= 31 {
+		return 1
+	}
+	return 1 << (bits - ones)
+}
+
+// ValidateSubnet ensures CIDR is valid and within configured size limits.
 func ValidateSubnet(cidr string) (*net.IPNet, error) {
 	ip, ipNet, err := net.ParseCIDR(strings.TrimSpace(cidr))
 	if err != nil {
@@ -36,9 +62,10 @@ func ValidateSubnet(cidr string) (*net.IPNet, error) {
 	if ip.To4() == nil {
 		return nil, fmt.Errorf("only IPv4 subnets are supported")
 	}
-	ones, bits := ipNet.Mask.Size()
-	if bits-ones > 8 {
-		return nil, fmt.Errorf("subnet too large: maximum /24 (256 hosts) allowed")
+	ones, _ := ipNet.Mask.Size()
+	maxPrefix := MaxAllowedPrefix()
+	if ones < maxPrefix {
+		return nil, fmt.Errorf("subnet too large: maximum /%d (%d hosts) allowed", maxPrefix, 1<<(32-maxPrefix))
 	}
 	if ip.IsLoopback() || ip.IsMulticast() {
 		return nil, fmt.Errorf("cannot scan loopback or multicast ranges")
@@ -47,12 +74,49 @@ func ValidateSubnet(cidr string) (*net.IPNet, error) {
 }
 
 // RunScan executes nmap and returns discovered hosts.
+// For subnets larger than /24, port-scan profiles use two phases: discovery then port scan on live hosts.
 func RunScan(ctx context.Context, subnet, scanType string) ([]HostResult, error) {
 	if scanType == "" {
 		scanType = "discovery"
 	}
 
-	args := buildNmapArgs(subnet, scanType)
+	ipNet, err := ValidateSubnet(subnet)
+	if err != nil {
+		return nil, err
+	}
+
+	large := SubnetHostCount(ipNet) > largeSubnetThreshold
+	needsPorts := scanType == "standard" || scanType == "ap" || scanType == "full"
+
+	if large && needsPorts {
+		live, err := runNmap(ctx, subnet, "discovery", true)
+		if err != nil {
+			return nil, err
+		}
+		if len(live) == 0 {
+			return live, nil
+		}
+		maxHosts := maxPortScanHosts()
+		if len(live) > maxHosts {
+			live = live[:maxHosts]
+		}
+		return runPortScanOnHosts(ctx, live, scanType)
+	}
+
+	return runNmap(ctx, subnet, scanType, large)
+}
+
+func maxPortScanHosts() int {
+	if v := os.Getenv("NMAP_MAX_PORTSCAN_HOSTS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			return n
+		}
+	}
+	return defaultMaxPortScanHosts
+}
+
+func runNmap(ctx context.Context, subnet, scanType string, large bool) ([]HostResult, error) {
+	args := buildNmapArgs(subnet, scanType, large)
 	cmd := exec.CommandContext(ctx, "nmap", args...)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -84,12 +148,90 @@ func RunScan(ctx context.Context, subnet, scanType string) ([]HostResult, error)
 	return results, nil
 }
 
-func buildNmapArgs(subnet, scanType string) []string {
-	base := []string{
-		"-oX", "-",
-		"-T4",
-		"--max-retries", "1",
-		"--host-timeout", "30s",
+func runPortScanOnHosts(ctx context.Context, hosts []HostResult, scanType string) ([]HostResult, error) {
+	targets := make([]string, len(hosts))
+	for i, h := range hosts {
+		targets[i] = h.IPAddress
+	}
+
+	args := buildPortScanArgs(scanType, false)
+	args = append(args, targets...)
+
+	cmd := exec.CommandContext(ctx, "nmap", args...)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		msg := strings.TrimSpace(string(out))
+		if msg == "" {
+			msg = err.Error()
+		}
+		return nil, fmt.Errorf("nmap port scan failed: %s", msg)
+	}
+
+	scanned, err := parseNmapXML(out)
+	if err != nil {
+		return nil, err
+	}
+
+	byIP := map[string]*HostResult{}
+	for i := range hosts {
+		byIP[hosts[i].IPAddress] = &hosts[i]
+	}
+
+	results := make([]HostResult, 0, len(scanned))
+	for _, h := range scanned {
+		if h.Status != "up" {
+			continue
+		}
+		if base, ok := byIP[h.IPAddress]; ok {
+			h.Hostname = coalesce(h.Hostname, base.Hostname)
+			h.MACAddress = coalesce(h.MACAddress, base.MACAddress)
+			h.Vendor = coalesce(h.Vendor, base.Vendor)
+			if h.LatencyMs == 0 {
+				h.LatencyMs = base.LatencyMs
+			}
+		}
+		classifyHost(&h)
+		results = append(results, h)
+	}
+
+	if len(results) < len(hosts) {
+		found := map[string]bool{}
+		for _, r := range results {
+			found[r.IPAddress] = true
+		}
+		for _, h := range hosts {
+			if !found[h.IPAddress] {
+				classifyHost(&h)
+				results = append(results, h)
+			}
+		}
+	}
+
+	sort.Slice(results, func(i, j int) bool {
+		return ipLess(results[i].IPAddress, results[j].IPAddress)
+	})
+
+	return results, nil
+}
+
+func coalesce(a, b string) string {
+	if a != "" {
+		return a
+	}
+	return b
+}
+
+func buildNmapArgs(subnet, scanType string, large bool) []string {
+	base := []string{"-oX", "-", "-T4", "--max-retries", "1"}
+
+	if large {
+		base = append(base,
+			"--min-rate", "300",
+			"--max-rtt-timeout", "1500ms",
+			"--host-timeout", "15s",
+		)
+	} else {
+		base = append(base, "--host-timeout", "30s")
 	}
 
 	switch scanType {
@@ -98,14 +240,35 @@ func buildNmapArgs(subnet, scanType string) []string {
 	case "standard":
 		return append(base, "-sT", "--open", "--top-ports", "100", subnet)
 	case "ap", "full":
+		args := buildPortScanArgs(scanType, large)
+		args = append(args, subnet)
+		return args
+	default:
+		if large {
+			return append(base, "-sn", "-PE", "-PP", "-PS22,80,443,8080,8291", subnet)
+		}
+		return append(base, "-sn", "-PS22,80,443,8080,8291", "-PE", subnet)
+	}
+}
+
+func buildPortScanArgs(scanType string, large bool) []string {
+	base := []string{"-oX", "-", "-T4", "--max-retries", "1", "-sT", "--open"}
+	if large {
+		base = append(base, "--min-rate", "200", "--host-timeout", "60s")
+	} else {
+		base = append(base, "--host-timeout", "30s")
+	}
+
+	switch scanType {
+	case "standard":
+		return append(base, "--top-ports", "100")
+	case "ap", "full":
 		return append(base,
-			"-sT", "--open",
 			"-p", "21,22,23,53,80,161,443,8080,8443,8291,8728,8729,1812,1813,9090,10443",
 			"--top-ports", "50",
-			subnet,
 		)
 	default:
-		return append(base, "-sn", "-PS22,80,443,8080,8291", "-PE", subnet)
+		return append(base, "--top-ports", "50")
 	}
 }
 
@@ -302,15 +465,33 @@ func classifyHost(h *HostResult) {
 	h.DeviceType = "unknown"
 }
 
-// ScanTimeout returns max duration for a scan type.
-func ScanTimeout(scanType string) time.Duration {
+// ScanTimeout returns max duration for a scan based on subnet size and type.
+func ScanTimeout(subnet, scanType string) time.Duration {
+	_, ipNet, err := net.ParseCIDR(strings.TrimSpace(subnet))
+	if err != nil {
+		return 15 * time.Minute
+	}
+	hosts := SubnetHostCount(ipNet)
+	large := hosts > largeSubnetThreshold
+	needsPorts := scanType == "standard" || scanType == "ap" || scanType == "full"
+
+	if large {
+		if needsPorts {
+			return 90 * time.Minute
+		}
+		if hosts > 4096 {
+			return 60 * time.Minute
+		}
+		return 30 * time.Minute
+	}
+
 	switch scanType {
 	case "ping", "discovery":
-		return 3 * time.Minute
+		return 5 * time.Minute
 	case "standard":
-		return 8 * time.Minute
+		return 10 * time.Minute
 	default:
-		return 12 * time.Minute
+		return 15 * time.Minute
 	}
 }
 

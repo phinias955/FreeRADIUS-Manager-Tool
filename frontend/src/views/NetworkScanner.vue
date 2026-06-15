@@ -26,10 +26,16 @@
             v-model="subnet"
             type="text"
             class="form-input font-mono"
-            placeholder="192.168.1.0/24"
+            placeholder="10.10.0.0/18"
             :disabled="scanning"
           />
-          <p class="text-xs text-gray-400 mt-1">Maximum /24 (256 hosts). Scan runs from the backend container network.</p>
+          <p class="text-xs text-gray-400 mt-1">
+            Up to {{ scannerStatus.max_subnet || '/18' }} ({{ formatHostCount(scannerStatus.max_hosts) }} addresses).
+            Large subnets use two-phase scanning and may take 30–90 minutes.
+          </p>
+          <p v-if="subnetHostEstimate > 256" class="text-xs text-amber-600 mt-1">
+            {{ formatHostCount(subnetHostEstimate) }} addresses — port scans run on live hosts only (max 512).
+          </p>
         </div>
         <div>
           <label class="form-label">Scan Profile</label>
@@ -57,7 +63,7 @@
           <span class="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full spinner"></span>
           <div>
             <p class="text-sm font-medium text-blue-800">Scan in progress — {{ activeScan?.subnet }} ({{ activeScan?.scan_type }})</p>
-            <p class="text-xs text-blue-600">This may take 1–10 minutes depending on subnet size and profile.</p>
+            <p class="text-xs text-blue-600">Large scans may take 30–90 minutes. Keep this page open or check Scan History.</p>
           </div>
         </div>
       </div>
@@ -213,7 +219,7 @@ import { format, parseISO } from 'date-fns'
 
 const toast = useToast()
 
-const subnet = ref('192.168.1.0/24')
+const subnet = ref('10.10.0.0/18')
 const scanType = ref('ap')
 const scanning = ref(false)
 const loadingHistory = ref(false)
@@ -241,6 +247,24 @@ const selectedTypeDescription = computed(() => {
   const t = (scannerStatus.value.scan_types || []).find(x => x.id === scanType.value)
   return t?.description || ''
 })
+
+const subnetHostEstimate = computed(() => {
+  try {
+    const [ip, prefix] = subnet.value.trim().split('/')
+    if (!ip || !prefix) return 0
+    const p = parseInt(prefix, 10)
+    if (p < 0 || p > 32) return 0
+    return Math.pow(2, 32 - p)
+  } catch {
+    return 0
+  }
+})
+
+function formatHostCount(n) {
+  if (!n) return '—'
+  if (n >= 1000) return n.toLocaleString()
+  return String(n)
+}
 
 const filteredHosts = computed(() => {
   let list = hosts.value
