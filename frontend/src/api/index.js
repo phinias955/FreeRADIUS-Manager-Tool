@@ -45,7 +45,7 @@ api.interceptors.response.use(
       if (code === 'SESSION_REVOKED') {
         const authStore = useAuthStore()
         authStore.clearAuth()
-        router.push({ path: '/login', query: { reason: 'session_revoked' } })
+        router.push('/login')
         return Promise.reject(error)
       }
 

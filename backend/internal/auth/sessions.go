@@ -53,6 +53,17 @@ func RevokeAllUserSessions(db *sql.DB, userID int) {
 	db.Exec(`UPDATE refresh_tokens SET revoked = TRUE WHERE user_id = $1 AND revoked = FALSE`, userID)
 }
 
+// RevokeSession invalidates refresh tokens for one login session.
+func RevokeSession(db *sql.DB, userID int, sessionID string) {
+	if sessionID == "" {
+		return
+	}
+	db.Exec(`
+		UPDATE refresh_tokens SET revoked = TRUE
+		WHERE user_id = $1 AND session_id = $2 AND revoked = FALSE`,
+		userID, sessionID)
+}
+
 // HasActiveSession reports whether the user is actively signed in elsewhere
 // (API activity within the concurrent block window).
 func HasActiveSession(db *sql.DB, userID int) (bool, error) {
@@ -70,7 +81,7 @@ func HasActiveSession(db *sql.DB, userID int) (bool, error) {
 	return exists, err
 }
 
-// ValidateSession checks that the JWT session is still the user's active login.
+// ValidateSession checks that the JWT session is still valid (not revoked or idle-expired).
 func ValidateSession(db *sql.DB, userID int, sessionID string) (bool, error) {
 	if sessionID == "" {
 		return false, nil

@@ -98,9 +98,6 @@ func (h *Handler) Login(c *gin.Context) {
 		WHERE id = $1`, user.ID,
 	)
 
-	// Single-session policy: new login replaces any existing session (other devices are signed out).
-	auth.RevokeAllUserSessions(h.db.DB, user.ID)
-
 	sessionID, err := auth.GenerateSessionID()
 	if err != nil {
 		respondError(c, http.StatusInternalServerError, "failed to create session")
@@ -202,10 +199,10 @@ func (h *Handler) RefreshToken(c *gin.Context) {
 	})
 }
 
-// Logout revokes all sessions for the current user.
+// Logout revokes only the current session (other devices stay signed in).
 func (h *Handler) Logout(c *gin.Context) {
 	claims, _ := middleware.GetClaims(c)
-	auth.RevokeAllUserSessions(h.db.DB, claims.UserID)
+	auth.RevokeSession(h.db.DB, claims.UserID, claims.SessionID)
 	c.JSON(http.StatusOK, gin.H{"message": "logged out successfully"})
 }
 

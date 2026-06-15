@@ -59,10 +59,6 @@
         <!-- Standard login -->
         <template v-else>
           <form @submit.prevent="handleLogin" class="space-y-5">
-            <div v-if="sessionRevokedMsg" class="p-3 bg-amber-50 border border-amber-200 rounded-lg">
-              <p class="text-sm text-amber-700">{{ sessionRevokedMsg }}</p>
-            </div>
-
             <div v-if="errorMsg" class="p-3 bg-red-50 border border-red-200 rounded-lg">
               <p class="text-sm text-red-600">{{ errorMsg }}</p>
             </div>
@@ -122,7 +118,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/store/auth'
 import { useToast } from 'vue-toastification'
@@ -139,13 +135,6 @@ const mfaRequired = ref(false)
 const loading = ref(false)
 const showPassword = ref(false)
 const errorMsg = ref('')
-
-const sessionRevokedMsg = computed(() => {
-  if (route.query.reason === 'session_revoked') {
-    return 'You were signed out because this account was used to sign in on another device.'
-  }
-  return ''
-})
 
 async function handleLogin() {
   errorMsg.value = ''

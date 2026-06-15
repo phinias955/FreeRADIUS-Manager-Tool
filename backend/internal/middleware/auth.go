@@ -13,7 +13,7 @@ const (
 	claimsKey = "claims"
 )
 
-// RequireAuth validates the Bearer JWT and ensures the session is still active (single login).
+// RequireAuth validates the Bearer JWT and ensures the session is still active.
 func RequireAuth(db *database.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		header := c.GetHeader("Authorization")
@@ -50,7 +50,7 @@ func RequireAuth(db *database.DB) gin.HandlerFunc {
 		active, err := auth.ValidateSession(db.DB, claims.UserID, claims.SessionID)
 		if err != nil || !active {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-				"error": "session ended or account logged in elsewhere",
+				"error": "session expired or signed out",
 				"code":  "SESSION_REVOKED",
 			})
 			return
